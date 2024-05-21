@@ -1,0 +1,14 @@
+charset,UTF-8
+type,shell
+name,master
+
+craftman,lost_nd_xxx
+craftmanw,ろすえん
+craftmanurl,https://lnx.flop.jp/
+
+readme.charset,UTF-8
+
+seriko.alignmenttodesktop,free
+seriko.use_self_alpha,1
+
+sakura.balloon.offsetx,-10

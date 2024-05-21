@@ -1,0 +1,6 @@
+charset,UTF-8
+type,ghost
+name,WeatherTimeCapsule
+directory,WeatherTimeCapsule_121VDeesjlPk
+refresh,1
+balloon.directory,WeatherTimeCapsuleBalloon_121VDeesjlPk

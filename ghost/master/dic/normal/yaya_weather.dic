@@ -1,0 +1,827 @@
+//******************************************************************************
+// 天気取得＆表示
+//******************************************************************************
+
+//******************************************************************************
+//整える
+//******************************************************************************
+SecToTimeOffset
+{
+	_seccount = TOINT(_argv[0])
+	_time = IARRAY
+
+	if _seccount < 0 {
+		//過去方向なので数値を反転
+		_seccount = 0 - (_seccount)
+	}
+
+	//年
+	if _seccount >= 31536000 {
+		_time[0] = TOINT(_seccount/31536000)
+	}
+	else {
+		_time[0] = 0
+	}
+
+	//月は考えたくないので0を入れておく
+	_time[1] = 0
+
+	//日
+	if _seccount >= 86400 {
+		_time[2] = TOINT((_seccount-_time[0]*31536000)/86400)
+	}
+	else {
+		_time[2] = 0
+	}
+
+	//曜日は空を入れておく
+	_time[3] = ''
+
+	//時
+	if _seccount >= 3600 {
+		_time[4] = TOINT((_seccount-_time[0]*31536000-_time[2]*86400)/3600)
+	}
+	else {
+		_time[4] = 0
+	}
+
+	//分
+	if _seccount >= 60 {
+		_time[5] = TOINT((_seccount-_time[0]*31536000-_time[2]*86400-_time[4]*3600)/60)
+	}
+	else {
+		_time[5] = 0
+	}
+
+	_t = ''
+
+	if _seccount >= 60 || _seccount <= -60 {
+		if _time[0] > 0 {
+			_t += "%(_time[0])年"
+		}
+		if _time[2] > 0 {
+			_t += "%(_time[2])日"
+		}
+		if _time[4] > 0 {
+			_t += "%(_time[4])時間"
+		}
+		if _time[5] > 0 {
+			_t += "%(_time[5])分"
+		}
+		if _argv[0] < 0 {
+			_t += '前'
+		}
+		elseif _argv[0] > 0 {
+			_t += '後'
+		}
+	}
+	_t
+}
+
+SecToTimeText
+{
+	_seccount = TOINT(_argv[0])
+	_time = GETTIME(_seccount)
+	STRFORM('$04d/$02d/$02d $02d:$02d', _time[0], _time[1], _time[2], _time[4], _time[5])
+}
+
+AngleToDirection
+{
+	_a0 = _argv[0]
+	if _a0 < 22.5 {
+		'北'
+	}
+	elseif _a0 < 45 {
+		'北北東'
+	}
+	elseif _a0 < 67.5 {
+		'北東'
+	}
+	elseif _a0 < 90 {
+		'東北東'
+	}
+	elseif _a0 < 112.5 {
+		'東'
+	}
+	elseif _a0 < 135 {
+		'東南東'
+	}
+	elseif _a0 < 157.5 {
+		'南東'
+	}
+	elseif _a0 < 180 {
+		'南南東'
+	}
+	elseif _a0 < 202.5 {
+		'南'
+	}
+	elseif _a0 < 225 {
+		'南南西'
+	}
+	elseif _a0 < 247.5 {
+		'南西'
+	}
+	elseif _a0 < 270 {
+		'西南西'
+	}
+	elseif _a0 < 292.5 {
+		'西'
+	}
+	elseif _a0 < 315 {
+		'西北西'
+	}
+	elseif _a0 < 337.5 {
+		'北西'
+	}
+	elseif _a0 < 360 {
+		'北北西'
+	}
+	else {
+		'北'
+	}
+}
+
+//******************************************************************************
+//取得済みの項目を見せる
+//******************************************************************************
+OnWeatherView
+{
+	if (TimeMode == 0 && STRLEN(Result_Mode0) <= 0) || (TimeMode == 1 && STRLEN(Result_Mode1) <= 0) || (TimeMode == 2 && STRLEN(Result_Mode2) <= 0) {
+		OnWeatherInfoRequest
+	}
+	else {
+		IsDisplay = 1
+
+		ScriptHead
+		--
+		'\![timerraise,0,1,OnWeatherInfoRequest]'
+		//情報取得の予約を取り消す
+		--
+		if TimeMode == 0 {
+			OnWeatherViewCurrent
+		}
+		else {
+			OnWeatherViewCommon
+		}
+		--
+		'\f[default]\_l[0,0]\f[align,right]\f[height,150%]\__q[OnMenu]≡\__q'
+		--
+		"\f[default]\_l[0,%(CurrentBalloon_ValidHeight)]\_l[,@-1em]\f[align,right]"
+		--
+		'\__q[script:"\![open,browser,https://open-meteo.com/]\![raise,OnWeatherView]"]Weather data by Open-Meteo.com\__q'
+		--
+		'\e'
+	}
+}
+
+OnWeatherViewCommon
+{
+	_now = GETTIME()
+	_data = ''
+	_width = TOINT(CurrentBalloon_ValidWidth/2)
+
+	if TimeMode == 1 {
+		_data = Result_Mode1
+	}
+	elseif TimeMode == 2 {
+		_data = Result_Mode2
+	}
+	else {
+		_data = Result_Mode0
+	}
+	_t = ''
+
+	_timetext = ''
+	_time = 0
+	_hear_sec = GETSECCOUNT()
+	_jisa_sec = (_data[2] + CurrentUtcOffsetSec) * 2
+
+	if TimeMode == 1 {
+		_time = GETTIME(_hear_sec+TimeOffset)[4]
+		_timetext = GETTIME(TOINT(_data[3][_time])+_jisa_sec)
+		_timetext = '情報時刻(現地): ' + STRFORM('$04d/$02d/$02d $02d:$02d', _timetext[0], _timetext[1], _timetext[2], _timetext[4], _timetext[5])
+	}
+	elseif TimeMode == 2 {
+		_time = GETTIME(TimeFixed)[4]
+		_timetext = GETTIME(TOINT(_data[3][_time])+_jisa_sec)
+		_timetext = '情報時刻(現地): ' + STRFORM('$04d/$02d/$02d $02d:$02d', _timetext[0], _timetext[1], _timetext[2], _timetext[4], _timetext[5])
+	}
+
+	if IsInfoTime != 'past' {
+		//未来方向の相対時刻・固定時刻
+		_schedule = GETTIME()
+		_schedule = (GETSECCOUNT(_schedule[0], _schedule[1], _schedule[2], 0, _schedule[4]+1, 1, 0) - GETSECCOUNT()) * 1000
+		//毎時1分まであと何ミリ秒か
+		_t += "\![timerraise,%(_schedule),1,OnWeatherInfoRequest]"
+	}
+	elseif TimeMode == 1 {
+		//過去方向の相対時刻
+		_schedule = GETTIME()
+		_schedule = (GETSECCOUNT(_schedule[0], _schedule[1], _schedule[2]+1, 0, 0, 1, 0) - GETSECCOUNT()) * 1000
+		//翌日の0時1分まであと何ミリ秒か
+		_t += "\![timerraise,%(_schedule),1,OnWeatherInfoRequest]"
+	}
+
+	if _data[6][_time] == 'NoData' || _data[6][_time] == 'null' || STRLEN(_data[6][_time]) <= 0 {
+		_t += '\f[align,center]\n[200]NoData'
+	}
+	else {
+		_tenki = WeaterCodeDescription(_data[6][_time])[2]
+		_tenki2 = WeaterCodeDescription(_data[6][_time])[3]
+		if _data[5][_time] == 0 && STRLEN(_tenki2) > 0 {
+			_tenki = _tenki2
+		}
+		_height = TOINT((CurrentBalloon_Lines-7)*100)
+		if _height < 100 {
+			_height = 100
+		}
+		_tenki3 = WeaterCodeDescription(_data[6][_time])[0] + '/' + WeaterCodeDescription(_data[6][_time])[1]
+		_t += "%(_tenki3)"
+		_t += '\_l[0,0]\n[100]\f[align,center]\f[name,weathericons-regular-webfont.ttf]'
+		_t += "\f[height,%(_height)%]\_u[0x%(_tenki)]"
+	}
+
+	_t += "\f[default]\_l[0,%(CurrentBalloon_ValidHeight)]\n[-600]\f[align,center]"
+
+	if STRLEN(GeoName) > 0 {
+		_t += GeoName[0] + ' ' + GeoName[1] + ' \n'
+	}
+	else {
+		_t += '緯度:' + TOSTR(_data[0]) + ', 経度:' + TOSTR(_data[1]) + '\n'
+	}
+
+	_timeoffset = IARRAY
+	_timeoffset[0] = _data[2] / 3600
+	_timeoffset[1] = (_data[2] % 3600) / 60
+
+	if _data[2] >= 0 {
+		_timeoffset = ' UTC+' + STRFORM('$02d:$02d', _timeoffset[0], _timeoffset[1])
+	}
+	else {
+		_timeoffset = ' UTC' + STRFORM('$03d:$02d', _timeoffset[0], _timeoffset[1])
+	}
+	_t += _timetext + _timeoffset
+	_t += '\n'
+	_t += '\f[align,left]'
+
+	_t += '降水量　　　: '
+	if STRLEN(_data[8][_time]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[8][_time] == 'NoData' || _data[8][_time] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$4.1f', _data[8][_time]) + 'mm'
+	}
+
+	_t += "\_l[%(_width),]"
+	_t += '気温: '
+	if STRLEN(_data[7][_time]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[7][_time] == 'NoData' || _data[7][_time] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$5.1f', _data[7][_time]) + '℃'
+	}
+	_t += '\n'
+
+	if IsInfoTime != 'past' {
+		_t += '降水確率(1h): '
+		if STRLEN(_data[4][_time]) == 0 {
+			_t += 'NoData'
+		}
+		elseif _data[4][_time] == 'NoData' || _data[4][_time] == 'null' {
+			_t += 'NoData'
+		}
+		else {
+			_t += STRFORM('$4.0f', _data[4][_time]) + '％'
+		}
+	}
+
+	_t += "\_l[%(_width),]"
+	_t += '風速: '
+	if STRLEN(_data[9][_time]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[9][_time] == 'NoData' || _data[9][_time] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$5.1f', _data[9][_time]) + 'm/s'
+	}
+	_t += '\n'
+
+	// _t += '予報時刻: '
+	// if STRLEN(_data[3][_time])==0 { _t += 'NoData' }
+	// elseif _data[3][_time] == 'NoData' || _data[3][_time] == 'null' { _t += 'NoData' }
+	// else {
+	// 	_yoho = GETTIME(TOINT(_data[3][_time])+_jisa_sec)
+	// 	_t += STRFORM('$04d$02d$02d $02d$02d',_yoho[0],_yoho[1],_yoho[2],_yoho[4],_yoho[5])
+	// }
+
+	_t += "\_l[%(_width),]"
+	_t += '風向: '
+	if STRLEN(_data[10][_time]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[10][_time] == 'NoData' || _data[10][_time] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += AngleToDirection(_data[10][_time])
+	}
+
+	_t
+}
+
+OnWeatherViewCurrent
+{
+	_data = Result_Mode0
+	_width = TOINT(CurrentBalloon_ValidWidth/2)
+	_t = ''
+
+	_jisa_sec = _data[2] + CurrentUtcOffsetSec
+
+	_time = GETTIME()
+	_time2 = GETSECCOUNT(_time[0], _time[1], _time[2], 0, _time[4], _time[5]-16, _time[6])
+
+	_timetext = GETTIME(_data[3]+_jisa_sec)
+	_time = _timetext[4]
+	_time3 = _data[3]
+
+	if _time2 > _time3 {
+		OnWeatherInfoRequest
+		return
+	}
+
+	_schedule = GETTIME()
+	_schedule = GETSECCOUNT(_schedule[0], _schedule[1], _schedule[2], 0, _schedule[4], _schedule[5]+16, _schedule[6])
+	_schedule = (_schedule - GETSECCOUNT()) * 1000
+	_t += "\![timerraise,%(_schedule),1,OnWeatherInfoRequest]"
+
+	_timetext = '情報時刻(現地): ' + STRFORM('$04d/$02d/$02d $02d:$02d', _timetext[0], _timetext[1], _timetext[2], _timetext[4], _timetext[5])
+
+	if STRLEN(_data[5]) <= 0 || _data[5] == 'NoData' || _data[5] == 'null' {
+		_t += '\f[align,center]\n[200]NoData'
+	}
+	else {
+		_tenki = WeaterCodeDescription(_data[5])[2]
+		_tenki2 = WeaterCodeDescription(_data[5])[3]
+		if _data[4] == 0 && STRLEN(_tenki2) > 0 {
+			_tenki = _tenki2
+		}
+		_height = TOINT((CurrentBalloon_Lines-7)*100)
+		if _height < 100 {
+			_height = 100
+		}
+		_tenki3 = WeaterCodeDescription(_data[5])[0] + '/' + WeaterCodeDescription(_data[5])[1]
+		_t += "%(_tenki3)"
+		_t += '\_l[0,0]\n[100]\f[align,center]\f[name,weathericons-regular-webfont.ttf]'
+		_t += "\f[height,%(_height)%]\_u[0x%(_tenki)]"
+	}
+	_t += "\f[default]\_l[0,%(CurrentBalloon_ValidHeight)]\n[-600]\f[align,center]"
+
+	if STRLEN(GeoName) > 0 {
+		_t += GeoName[0] + ' ' + GeoName[1] + ' \n'
+	}
+	else {
+		_t += '緯度:' + TOSTR(_data[0]) + ', 経度:' + TOSTR(_data[1]) + '\n'
+	}
+
+	_timeoffset = IARRAY
+	_timeoffset[0] = _data[2] / 3600
+	_timeoffset[1] = (_data[2] % 3600) / 60
+
+	if _data[2] >= 0 {
+		_timeoffset = ' UTC+' + STRFORM('$02d:$02d', _timeoffset[0], _timeoffset[1])
+	}
+	else {
+		_timeoffset = ' UTC' + STRFORM('$03d:$02d', _timeoffset[0], _timeoffset[1])
+	}
+	_t += _timetext + _timeoffset
+	_t += '\n'
+	_t += '\f[align,left]'
+
+	_t += '降水量　　　: '
+	if STRLEN(_data[7]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[7] == 'NoData' || _data[7] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$4.1f', _data[7]) + 'mm'
+	}
+
+	_t += "\_l[%(_width),]"
+	_t += '気温: '
+	if STRLEN(_data[6]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[6] == 'NoData' || _data[6] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$5.1f', _data[6]) + '℃'
+	}
+	_t += '\n'
+
+	_t += '降水確率(1h): '
+	if STRLEN(_data[11][_time]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[11][_time] == 'NoData' || _data[11][_time] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$4.0f', _data[11][_time]) + '％'
+	}
+
+	_t += "\_l[%(_width),]"
+	_t += '風速: '
+	if STRLEN(_data[8]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[8] == 'NoData' || _data[8] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += STRFORM('$5.1f', _data[8]) + 'm/s'
+	}
+	_t += '\n'
+
+	// _t += '予報時刻: '
+	// if STRLEN(_data[10][_time])==0 { _t += 'NoData' }
+	// elseif _data[10][_time] == 'NoData' || _data[10][_time] == 'null' { _t += 'NoData' }
+	// else {
+	// 	_yoho = GETTIME(TOINT(_data[10][_time])+_jisa_sec)
+	// 	_t += STRFORM('$04d$02d$02d $02d$02d',_yoho[0],_yoho[1],_yoho[2],_yoho[4],_yoho[5])
+	// }
+
+	_t += "\_l[%(_width),]"
+	_t += '風向: '
+	if STRLEN(_data[9]) == 0 {
+		_t += 'NoData'
+	}
+	elseif _data[9] == 'NoData' || _data[9] == 'null' {
+		_t += 'NoData'
+	}
+	else {
+		_t += AngleToDirection(_data[9])
+	}
+
+	_t
+}
+
+//******************************************************************************
+//取得する
+//******************************************************************************
+OnWeatherInfoRequest
+{
+	IsWaitingWeatherInfoRequest = 0
+
+	if IsDisplay != 1 {
+		return
+	}
+
+	_ElapsedSec = GETTICKCOUNT() / 1000 - LastTickTime_GetWeatherInfo
+	//前回取得からの経過秒
+
+	if GETTICKCOUNT() < 30000 {
+		//起動直後
+		OnWeatherInfoGetExec
+	}
+	elseif _ElapsedSec >= 30 {
+		//30秒以上経っている
+		OnWeatherInfoGetExec
+	}
+	else {
+		OnWeatherInfoRequest_Wait
+	}
+}
+
+OnWeatherInfoRequest_Wait
+{
+	IsWaitingWeatherInfoRequest = 1
+	ScriptHead
+	--
+	'\![timerraise,31000,1,OnWeatherInfoRequest]'
+	--
+	'前回の情報取得から時間があまり経過していません。\n/
+	約30秒待機します。'
+	--
+	'\e'
+}
+
+OnWeatherInfoGetExec
+{
+	LastTime_GetWeatherInfo = GETSECCOUNT()
+	LastTickTime_GetWeatherInfo = TOINT(GETTICKCOUNT()/1000)
+
+	_json = ''
+	_now = GETTIME()
+	_now_sec = GETSECCOUNT()
+	_pastinfotime = GETSECCOUNT(_now[0], _now[1], _now[2]-6, 0, _now[4], _now[5], _now[6])
+
+	if TimeMode == 1 && TimeOffset < -518400 {
+		IsInfoTime = 'past'
+		_json = PastInfo(GETSECCOUNT()+TimeOffset)
+	}
+	elseif TimeMode == 1 {
+		IsInfoTime = 'future'
+		_json = FutureInfo(GETSECCOUNT()+TimeOffset)
+	}
+	elseif TimeMode == 2 && TimeFixed < _pastinfotime {
+		IsInfoTime = 'past'
+		_json = PastInfo(TimeFixed)
+	}
+	elseif TimeMode == 2 {
+		IsInfoTime = 'future'
+		_json = FutureInfo(TimeFixed)
+	}
+	else {
+		IsInfoTime = 'current'
+		_json = CurrentInfo
+	}
+	--
+	ScriptHeadSimple
+	--
+	'\![execute,http-get,"' + _json + '",--async=OnWeatherInfoGet,--nofile=UTF-8]'
+	--
+	'Open-Meteoより天気情報を取得中...'
+	--
+	'\e'
+}
+
+PastInfo
+{
+	_time = GETTIME(TOINT(_argv[0]))
+	_time1 = GETTIME(GETSECCOUNT(_time[0], _time[1], _time[2]-1, 0, _time[4], _time[5], _time[6]))
+	_time2 = GETTIME(GETSECCOUNT(_time[0], _time[1], _time[2]+1, 0, _time[4], _time[5], _time[6]))
+	_time1 = STRFORM('$04d-$02d-$02d', _time1[0], _time1[1], _time1[2])
+	_time2 = STRFORM('$04d-$02d-$02d', _time2[0], _time2[1], _time2[2])
+	_time0 = GETTIME(GETSECCOUNT(_time[0], _time[1], _time[2], 0, _time[4], _time[5], _time[6]))
+	_time0 = STRFORM('$04d-$02d-$02d', _time0[0], _time0[1], _time0[2])
+
+	_json = 'https://archive-api.open-meteo.com/v1/archive?'
+
+	_json += 'latitude=' + TOSTR(GeoCoordinates[1])
+	//緯度
+	_json += '&longitude=' + TOSTR(GeoCoordinates[0])
+	//経度
+
+	_json += '&wind_speed_unit=ms'
+	//風速の単位を秒速？メートルで
+	_json += '&timeformat=unixtime'
+	//時間形式をunixtimeで
+	_json += '&timezone=auto'
+	//タイムゾーンを自動的に検出する
+
+	_json += '&start_date=' + _time0
+	//開始日
+	_json += '&end_date=' + _time0
+	//終了日
+
+	_json += '&hourly='
+	//時間ごとの天気
+	_json += 'is_day,'
+	//昼か夜か
+	_json += 'weather_code,'
+	//天気コード
+	_json += 'temperature_2m,'
+	//温度(地表2m)
+	_json += 'precipitation,'
+	//降水量
+	_json += 'wind_speed_10m,'
+	//風速(地表10m)
+	_json += 'wind_direction_10m,'
+	//風向(地表10m)
+	_json += 'precipitation_probability'
+	//降水確率
+
+	_json
+}
+
+CurrentInfo
+{
+	_json = 'https://api.open-meteo.com/v1/forecast?'
+
+	_json += 'latitude=' + TOSTR(GeoCoordinates[1])
+	//緯度
+	_json += '&longitude=' + TOSTR(GeoCoordinates[0])
+	//経度
+
+	_json += '&wind_speed_unit=ms'
+	//風速の単位を秒速？メートルで
+	_json += '&timeformat=unixtime'
+	//時間形式をunixtimeで
+	_json += '&timezone=auto'
+	//タイムゾーンを自動的に検出する
+	_json += '&forecast_days=1'
+	//予報日数を1日で
+
+	_json += '&current='
+	//現在の天気
+	_json += 'is_day,'
+	//昼か夜か
+	_json += 'weather_code,'
+	//天気コード
+	_json += 'temperature_2m,'
+	//温度(地表2m)
+	_json += 'precipitation,'
+	//降水量
+	_json += 'wind_speed_10m,'
+	//風速(地表10m)
+	_json += 'wind_direction_10m'
+	//風向(地表10m)
+
+	_json += '&hourly='
+	//時間ごとの天気
+	_json += 'precipitation_probability'
+	//降水確率
+
+	_json
+}
+
+FutureInfo
+{
+	_time = GETTIME(TOINT(_argv[0]))
+	_time1 = GETTIME(GETSECCOUNT(_time[0], _time[1], _time[2]-1, 0, _time[4], _time[5], _time[6]))
+	_time1 = STRFORM('$04d-$02d-$02d', _time1[0], _time1[1], _time1[2])
+	_time2 = GETTIME(GETSECCOUNT(_time[0], _time[1], _time[2]+1, 0, _time[4], _time[5], _time[6]))
+	_time2 = STRFORM('$04d-$02d-$02d', _time2[0], _time2[1], _time2[2])
+	_time0 = GETTIME(GETSECCOUNT(_time[0], _time[1], _time[2], 0, _time[4], _time[5], _time[6]))
+	_time0 = STRFORM('$04d-$02d-$02d', _time0[0], _time0[1], _time0[2])
+
+	_json = 'https://api.open-meteo.com/v1/forecast?'
+
+	_json += 'latitude=' + TOSTR(GeoCoordinates[1])
+	//緯度
+	_json += '&longitude=' + TOSTR(GeoCoordinates[0])
+	//経度
+
+	_json += '&wind_speed_unit=ms'
+	//風速の単位を秒速？メートルで
+	_json += '&timeformat=unixtime'
+	//時間形式をunixtimeで
+	_json += '&timezone=auto'
+	//タイムゾーンを自動的に検出する
+
+	_json += '&start_date=' + _time0
+	//開始日
+	_json += '&end_date=' + _time0
+	//終了日
+
+	_json += '&hourly='
+	//時間ごとの天気
+	_json += 'is_day,'
+	//昼か夜か
+	_json += 'weather_code,'
+	//天気コード
+	_json += 'temperature_2m,'
+	//温度(地表2m)
+	_json += 'precipitation,'
+	//降水量
+	_json += 'wind_speed_10m,'
+	//風速(地表10m)
+	_json += 'wind_direction_10m,'
+	//風向(地表10m)
+	_json += 'precipitation_probability'
+	//降水確率
+
+	_json
+}
+
+OnWeatherInfoGet
+{
+	_objectID = JSON.readJson(reference[3])
+	_data = IARRAY
+
+	if TimeMode == 0 {
+		_data[0] = TOREAL(IOBJ.iObj(_objectID, 'latitude'))
+		//0 緯度
+		_data[1] = TOREAL(IOBJ.iObj(_objectID, 'longitude'))
+		//1 経度
+		_data[2] = TOINT(IOBJ.iObj(_objectID, 'utc_offset_seconds'))
+		//2 時差
+		_data[3] = TOINT(IOBJ.iObj(_objectID, 'current', 'time'))
+		//3 データの時間
+		_data[4] = TOINT(IOBJ.iObj(_objectID, 'current', 'is_day'))
+		//4 昼か夜か
+		_data[5] = TOINT(IOBJ.iObj(_objectID, 'current', 'weather_code'))
+		//5 天気コード
+		_data[6] = TOSTR(IOBJ.iObj(_objectID, 'current', 'temperature_2m'))
+		//6 気温(地表2m)
+		_data[7] = TOSTR(IOBJ.iObj(_objectID, 'current', 'precipitation'))
+		//7 降水量
+		_data[8] = TOSTR(IOBJ.iObj(_objectID, 'current', 'wind_speed_10m'))
+		//8 風速(地表10m)
+		_data[9] = TOINT(IOBJ.iObj(_objectID, 'current', 'wind_direction_10m'))
+		//9 風向(地表10m)
+		_data[10] = IOBJ.iObj(_objectID, 'hourly', 'time')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[10], _c)
+		}
+		_data[10] = TOSTR(_res)
+		//10 降水量予測のデータの時間
+		_data[11] = IOBJ.iObj(_objectID, 'hourly', 'precipitation_probability')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[11], _c)
+		}
+		_data[11] = TOSTR(_res)
+		//11 降水量予測(毎時)
+	}
+	else {
+		_data[0] = IOBJ.iObj(_objectID, 'latitude')
+		//0 緯度
+		_data[1] = IOBJ.iObj(_objectID, 'longitude')
+		//1 経度
+		_data[2] = IOBJ.iObj(_objectID, 'utc_offset_seconds')
+		//2 時差
+		_data[3] = IOBJ.iObj(_objectID, 'hourly', 'time')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[3], _c)
+		}
+		_data[3] = TOSTR(_res)
+		//3 データの時間
+		_data[4] = IOBJ.iObj(_objectID, 'hourly', 'precipitation_probability')
+		if STRLEN(_data[4]) == 0 {
+			_data[4] = 'NoData'
+		}
+		else {
+			_res = IARRAY
+			for _c=0; _c<24; _c++ {
+				_res[_c] = IOBJ.iObj(_data[4], _c)
+			}
+			_data[4] = TOSTR(_res)
+		}
+		//4 降水確率
+		_data[5] = IOBJ.iObj(_objectID, 'hourly', 'is_day')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[5], _c)
+		}
+		_data[5] = TOSTR(_res)
+		//5 昼か夜か
+		_data[6] = IOBJ.iObj(_objectID, 'hourly', 'weather_code')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[6], _c)
+		}
+		_data[6] = TOSTR(_res)
+		//6 天気コード
+		_data[7] = IOBJ.iObj(_objectID, 'hourly', 'temperature_2m')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[7], _c)
+		}
+		_data[7] = TOSTR(_res)
+		//7 温度(地表2m)
+		_data[8] = IOBJ.iObj(_objectID, 'hourly', 'precipitation')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[8], _c)
+		}
+		_data[8] = TOSTR(_res)
+		//8 降水量
+		_data[9] = IOBJ.iObj(_objectID, 'hourly', 'wind_speed_10m')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[9], _c)
+		}
+		_data[9] = TOSTR(_res)
+		//9 風速(地表10m)
+		_data[10] = IOBJ.iObj(_objectID, 'hourly', 'wind_direction_10m')
+		_res = IARRAY
+		for _c=0; _c<24; _c++ {
+			_res[_c] = IOBJ.iObj(_data[10], _c)
+		}
+		_data[10] = TOSTR(_res)
+		//10 風向(地表10m)
+	}
+
+	LETTONAME('Result_Mode'+TimeMode, _data)
+
+	SAVEVAR()
+
+	if IsDisplay == 1 {
+		OnWeatherView
+	}
+}
+
+OnWeatherInfoGetFailure
+{
+	ScriptHeadSimple
+	--
+	'天気情報の保存に失敗'
+	--
+	'\e'
+}
+
+

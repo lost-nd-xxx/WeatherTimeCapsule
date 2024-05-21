@@ -1,0 +1,236 @@
+//******************************************************************************
+// YAYA　jsonパーサ with オブジェクト風の何か
+//******************************************************************************
+//プライベート関数に外からアクセスできません。
+#define io S5LMkTRQW9zN
+#define js R9PHz6m7FjaP
+//******************************************************************************
+// 外から呼び出す関数
+//******************************************************************************
+
+JSON.readJson{
+	//_input=REQ.ARGS
+	_input=_argv
+	//RES.RESULT=js.readJson(_input[0])
+	js.readJson(_input[0])
+}
+
+JSON.readFile{
+	//_input=REQ.ARGS
+	_input=_argv
+	//RES.RESULT=js.readFile(_input)
+	_result=js.readFile(_input)
+	_result
+	LOGGING("result: "+_result)
+	//RES.RESULT='["test":"good"]'
+}
+
+//
+//
+//
+//
+//
+//
+//******************************************************************************
+// json読み出し
+//******************************************************************************
+
+
+
+
+//js.makeCode(文字列長=8)
+//---------アルファベット大文字[A-Z]からなる8文字の文字列をランダムに生成する。
+
+js.makeCode{
+	_len=8
+	if _argc!=0{
+		_len=_argv[0]
+	}
+	_ans=""
+	for _i;_i<_len;_i++{
+		_ans+=CHR(65+RAND(25))
+	}
+}
+//js.escapeName(キーにする変数)
+//---------js.makeCodeを使った任意の文字列を含む暗号作成
+js.escapeName{
+	"nigeri"+_argv[0]+js.makeCode(10)
+}
+//js.escapeCell(id)
+//--------jsonオブジェクトの各項をid付きの名前に変換する。
+js.escapeCell{
+	'|cell'+_argv[0]+'|'
+}
+//js.decodeCell(js.escapeCellで出力されるような名前)
+//--------js.escapeCellによる名前からidを導く。
+js.decodeCell{
+	_text=_argv[0]
+	_idStr=SUBSTR(_text,5,STRLEN(_text)-6)
+	TOINT(_idStr)
+}
+
+//js.readJson(json文字列)
+//---------入力されたjsonファイルの文字列をiオブジェクトに変換する。
+//--------jsonデータを格納したiオブジェクトのルート変数の名前を返す。
+//--------第二変数で、iオブジェクトの名前を指定できる。
+//--------同名のオブジェクトを事前に削除するため注意。
+js.readJson{
+
+	_escapeBS=js.escapeName(0)
+	_escapeDC=js.escapeName(1)
+	_escapeSL=js.escapeName(2)
+	_text=_argv[0]
+	_text=REPLACE(_text,'\\',_escapeBS)
+	_text=REPLACE(_text,'\"',_escapeDC)
+	_text=REPLACE(_text,'\/',_escapeSL)
+	_cells=IARRAY()
+	_flug=0
+
+	_x=RE_GREP(_text,'"[^"]*"')
+	_cellbs=RE_GETSTR
+	_cells=IARRAY
+	_escapeC=IARRAY()
+	_nStrs=ARRAYSIZE(_cellbs)
+	for _i=0;_i<_nStrs; _i++{
+		_cellb=_cellbs[_i]
+		_cells,=SUBSTR(_cellb,1,STRLEN(_cellb)-2)
+		_escapeC,=js.escapeCell(_i)
+		_text=REPLACE(_text,_cellb,_escapeC[_i],1)
+	}
+	_text=RE_REPLACEEX(_text,'[ \t\n\r\f]',"")
+	_text=RE_REPLACE(_text,'(\\t|\\n|\\r|\\f)',"")
+	//_x=RE_GREP(_text,'([:\[,]([0-9.e\-]+|null|undefined|true|false)[:\],}]')
+	//_x=RE_GREP(_text,'((?<![a-zA-Z])[+\-]?[0-9]+[\.e-]?[0-9]*|null|undefined|true|false)(?!\|[0-9])')
+	_x=RE_GREP(_text,'((?<=[:\[,])[+\-]?[0-9]+[\.e-]?[0-9]*|null|undefined|true|false)(?=[\],}])')
+	_intbs=RE_GETSTR
+	LOGGING("_text:"+_text)
+	LOGGING("_intbs:"+_intbs)
+	_ints=IARRAY()
+	for _i=0;_i<ARRAYSIZE(_intbs);_i++{
+		_intb=_intbs[_i]
+		//_head=SUBSTR(_intb,0,1)
+		//_foot=SUBSTR(_intb,-1,1)
+		//_nStrs=SUBSTR(_intb,1,STRLEN(_intb)-2)
+		_int=_intb
+		_escapeC,=js.escapeCell(_i+_nStrs)
+		_text=RE_REPLACEEX(_text,"(?<=[:\[,])"+_int+"(?=[\],}])",_escapeC[_i+_nStrs],1)
+		LOGGING()
+		if ISINTSTR(_int){
+			_int=TOINT(_int)
+		}elseif ISREALSTR(_int){
+			_int=TOREAL(_int)
+		}
+		_ints,=_int
+	}
+	LOGGING("text: "+_text)
+	_cells,=_ints
+	//'[^\|a-zA-Z,\{\}\[\]]'
+	_iObjName="IOBJ.JsonData"
+	if _argc==2{
+		_iObjName=_argv[1]
+	}
+	_x=io.deleteIObj(_iObjName)
+	_x=io.createIObj(_iObjName)
+	_root=(IARRAY,_iObjName+"0")
+	_rootId=0
+	_flag=0
+	_tes=0
+	_flag2=0
+	LOGGING("text-cells"+_text)
+	while _flag==0{
+
+		_x=RE_GREP(_text,'\{[^\{\}\[\]]*\}')
+		_objbs=RE_GETSTR
+		_x=RE_GREP(_text,'\[[^\{\}\[\]]*\]')
+		_arraybs=RE_GETSTR
+
+		for _i=0;_i<ARRAYSIZE(_objbs); _i++{
+			LOGGING(_i+" text: "+_text)
+			_objb=_objbs[_i]
+			LOGGING("objRead:"+_objb)
+			if _objb!="{}"{
+				_objStr=SUBSTR(_objb,1,STRLEN(_objb)-2)
+
+				_lines=SPLIT(_objStr,',')
+				foreach _lines; _line{
+					LOGGING("lineRead: "+_line)
+					_items=SPLIT(_line,':')
+					_keyId=_items[0]
+					_valueId=_items[1]
+					_key=_cells[js.decodeCell(_keyId)]
+					//_value=_cells[js.decodeCell(_valueId)]
+					if RE_MATCH(_valueId,'\|cell\d+\|'){
+						_value=_cells[js.decodeCell(_valueId)]
+						if GETTYPE(_value)==3{
+							_value=REPLACE(_value,_escapeBS,'\\')
+							_value=REPLACE(_value,_escapeDC,'"')
+							_text=REPLACE(_text,_escapeSL,'\/')
+						}
+						_x=io.addItem(_root[_rootId],_value,_key)
+					}else{
+						_sonRootId=js.decodeCell(_valueId)
+						LOGGING("_rootId: "+_rootId)
+						LOGGING("_root: "+_root)
+						LOGGING("_root[_rootId]: "+_root[_rootId])
+						_x=io.putIObj(_root[_rootId],_root[_sonRootId],_key)
+					}
+				}
+			}
+			_text=REPLACE(_text,_objb,'|root'+_rootId+'|',1)
+			_root,=io.addRoot(_iObjName)
+			_rootId++
+		}
+
+		for _i=0;_i<ARRAYSIZE(_arraybs);_i++{
+
+			_arrayb=_arraybs[_i]
+			if _arrayb!="[]"{
+				_arrayStr=SUBSTR(_arrayb,1,STRLEN(_arrayb)-2)
+				_items=SPLIT(_arrayStr,',')
+
+				foreach _items; _item{
+					if RE_MATCH(_item,'\|cell\d+\|'){
+						_value=_cells[js.decodeCell(_item)]
+						_x=io.addItem(_root[_rootId],_value,-1)
+					}else{
+						_sonRootId=js.decodeCell(_item)
+						_x=io.putIObj(_root[_rootId],_root[_sonRootId],-1)
+					}
+				}
+			}
+			_text=REPLACE(_text,_arrayb,'|root'+(_rootId)+'|',1)
+			_root,=io.addRoot(_iObjName)
+			_rootId++
+		}
+		_flag=RE_MATCH(_text,'\|root\d+\|')
+		_flag2++
+	}
+
+	io.removeRoot(_root[_rootId])// 1つ余る空のルートオブジェクトを消す。
+	_rootDic=EVAL(_iObjName+"RootDic")
+	_jsonData=_root[js.decodeCell(_text)]
+	_jsonData
+}
+js.readFile{
+	if _argc>=2{
+		FCHARSET(_argv[1])
+	}else{
+		FCHARSET(1)
+	}
+
+	_path=_argv[0]
+	if FOPEN( _path, "r" ){
+		_text=""
+		_line=FREAD(_path)
+		while _line!=-1{
+			_text+=_line+"\n"
+			_line=FREAD(_path)
+		}
+
+		FCLOSE( _path )
+		--
+		_text
+	}else{
+		""
+	}
+}

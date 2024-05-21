@@ -1,0 +1,1 @@
+ゴースト「WeatherTimeCapsule」のmasterシェル

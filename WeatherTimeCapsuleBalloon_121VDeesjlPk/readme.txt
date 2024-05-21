@@ -1,0 +1,1 @@
+ゴースト「WeatherTimeCapsule」専用バルーン

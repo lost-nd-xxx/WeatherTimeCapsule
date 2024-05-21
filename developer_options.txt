@@ -1,0 +1,4 @@
+WeatherTimeCapsuleBalloon_121VDeesjlPk,noupdate
+.github/,nonar,noupdate
+md5buildignore.txt,nonar,noupdate
+//developer_options.txt,nonar,noupdate

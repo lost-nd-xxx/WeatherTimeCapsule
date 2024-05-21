@@ -1,0 +1,648 @@
+//******************************************************************************
+// YAYA　jsonパーサ with オブジェクト風の何か
+//******************************************************************************
+//プライベート関数に外からアクセスできません。
+#define io S5LMkTRQW9zN
+//******************************************************************************
+// 外から呼び出す関数
+//******************************************************************************
+
+IOBJ.iObj{
+	//_input=REQ.ARGS
+	_input=_argv
+	//RES.RESULT=io.iObj(_input)
+	io.iObj(_input)
+}
+IOBJ.iObj2{
+	//_input=REQ.ARGS
+	_input=_argv
+	_res=io.iObj2(_input)
+	//RES.VALUE0=_res[0]
+	//RES.VALUE1=_res[1]
+	_res
+}
+
+IOBJ.showIObj{
+	//_input=REQ.ARGS
+	_input=_argv
+	//RES.RESULT=js.showIObj(_input)
+	js.showIObj(_input)
+}
+IOBJ.iObjToJson{
+	//_input=REQ.ARGS
+	_input=_argv
+	//RES.RESULT=js.iObjToJson(_input)
+	js.iObjToJson(_input)
+}
+IOBJ.iObjArray{
+	//_input=REQ.ARGS[0]
+	_input=_argv
+	_iObjArray=EVAL(_input)
+	//for _i=0;_i<ARRAYSIZE(_iObjArray);_i++{
+	//	LETTONAME('RES.VALUE' + _i , _iObjArray[_i])
+	//}
+	_iObjArray
+}
+IOBJ.iObjSize{
+	//io.iObjSize(REQ.ARGS[0])
+	io.iObjSize(_argv[0])
+}
+IOBJ.iObjKeys{
+	//_input=REQ.ARGS[0]
+	_input=_argv
+	_iObjArray=EVAL(_input)
+	//for _i=0;_i<ARRAYSIZE(_iObjArray/3);_i++{
+	//	LETTONAME('RES.VALUE' + _i , __iObjArray[_i*3])
+	//}
+	_result = IARRAY
+	for _i=0;_i<ARRAYSIZE(_iObjArray/3);_i++{
+		_result = ( _result , _iObjArray[_i*3] )
+	}
+}
+IOBJ.iObjValues{
+	//_input=REQ.ARGS[0]
+	_input=_argv[0]
+	_iObjArray=EVAL(_input)
+	//for _i=0;_i<ARRAYSIZE(_iObjArray/3);_i++{
+	//	LETTONAME('RES.VALUE' + _i , _iObjArray[_i*3+2])
+	//}
+	_result = IARRAY
+	for _i=0;_i<ARRAYSIZE(_iObjArray/3);_i++{
+		_result = ( _result , _iObjArray[_i*3+2] )
+	}
+}
+
+//*************************************
+//iオブジェクトの構成
+//**************************************
+/*
+iオブジェクトは、複数の汎用配列をつなぎ合わせてできており、
+専用の関数を介することでjavascriptのオブジェクトのような辞書型や配列が階層的に重なった構造を扱うことができる。
+
+変数をメタにいじって新しい方のようなものを作っている。
+iオブジェクトを形作る各変数はグローバル変数で定義されているため、扱いに注意が必要である。
+iオブジェクトの構造について文で説明するのは難しいので例で説明する。
+
+jsonのオブジェクトで、下記のようなものがあるとする。
+{
+	"名前":"さくら"
+	"性別":"女性"
+	"年齢":14
+	"友達":[
+		{
+			"名前":"うにゅう"
+			"好感度":"ふつう"
+		},
+		{
+			"名前":"マスター"
+			"好感度":"低い"
+		}
+	]
+}
+iオブジェクトにおいて上記のオブジェクトは以下のような変数の集合で表される。
+IOBJ.Sample0 == ("名前","value","さくら",
+                "年齢","value",14,
+                "友達","object","IOBJ.Sample1")
+IOBJ.Sample1 == (0,"object","IOBJ.Sample2",
+                1,"object","IOBJ.Sample3")
+IOBJ.Sample2 == ("名前","value","うにゅう",
+                "好感度","value","ふつう")
+IOBJ.Sample3 == ("名前","value","マスター",
+                "好感度","value","低い")
+IOBJ.SampleRootDic ==(IARRAY,0)                       ←要素が0のみの汎用配列
+IOBJ.SampleLen == 4
+
+1つのjsonオブジェクトは複数のiオブジェクトが階層状になってできている。便宜的にこの一番大きなくくりのiオブジェクトを大iオブジェクトと呼称する。
+正直関数名などでこの大iオブジェクトと普通のiオブジェクトがごっちゃになっていて混乱のもと。
+序数付きの各変数(IOBJ.Sample0,IOBJ.Sample1....)は、一つのオブジェクト(配列か、辞書)に対応している。
+変数の中は、3×Nの二次元配列となっており、3つのデータで、オブジェクトの1要素に対応している。
+(YAYAでは1次元の汎用配列しか扱えないため、実装上は一次元配列。)
+1つ目はキーで、辞書なら文字列、配列なら整数が入る。
+2つ目は、要素のデータタイプで、文字列や整数などの単一データなら"value"、配列あるいは辞書なら"object"が入る。
+3つ目は、もし要素のデータタイプが"value"なら、その値が入る。"object"なら、そのobjectの変数名が入る。
+
+[iオブジェクト名]RootDic (例：IOBJ.SampleRootDic)は、オブジェクトの根(ルートオブジェクト)、つまり一番外側の親のオブジェクトの序数を格納している汎用配列である。
+[iオブジェクト名]Lenは、大iオブジェクトに含まれるiオブジェクトの数（序数の最大値+1）を格納している。
+
+RootDicが汎用配列であることからわかるように、単一の大iオブジェクトが複数のルートオブジェクトを持つことができる。
+この機能は、基本的に、オブジェクトの柔軟な作成のためにある。
+この機能のおかげで、先に子要素のオブジェクトを定義してから親要素を定義し、そこに子要素を格納することができる。
+例えば、上記の例でいえば、先に、"うにゅう"や"マスター"のデータのオブジェクトを定義し、その後、"さくら"のオブジェクトを作成、
+その後に、"さくら"の"友達"のところに"うにゅう"、"マスター"のデータを格納することができる。
+最終的には、ルートオブジェクトは"さくら"のもの一つだが、中途では、"さくら"、"うにゅう"、"マスター"
+の3つのルートオブジェクトが並列に存在する。
+このように一つの大iオブジェクトは複数のルートオブジェクトを持つことができるが、それは便宜的なものであり、完成した後は
+1つの大iオブジェクトは1つしかルートオブジェクトを持たないのが望ましい。
+故にiオブジェクトはオブジェクトの一部を取得して別のオブジェクトに埋め込み直すといった操作を直接行うことは現状できない。
+
+またモジュール全体で1つ、IOBJ.dicというグローバル変数を持つ。IOBJ.dicは、定義された大iオブジェクトの名前（例えば上記の例ではIOBJ.Sampleというのがiオブジェクトの名前）を全て格納した汎用配列である。
+
+
+
+上記のようなiオブジェクトの作成、操作は、下記の関数を用いて行う。
+
+
+--io.iObj(起点となるオブジェクトの変数名,キー1[,キー2,....]):
+
+キーに対応するiオブジェクトの子要素の取り出しを行う。
+第一引数の対象となるオブジェクトはルートオブジェクトでなくても良い。
+入力はオブジェクトの変数ではなく、オブジェクトの変数名(文字列)であることに注意
+例)
+io.iObj("IOBJ.Sample0","名前")=="御影さくら"
+io.iObj("IOBJ.Sample0","友達",0,"名前")=="うにゅう"
+io.iObj("IOBJ.Sample3","名前")=="マスター"
+
+--io.createIObj(iオブジェクト名)
+新しい大iオブジェクトを作成する。変数名がすでに使われている場合などは実行されない。
+新たに同名のオブジェクトを作り直したい場合、事前にio.deleteIObjを実行する。
+成功で1、失敗で0を返す。
+iオブジェクトの名前は必ず、"iObj"で始まるものにしなければならない。
+iオブジェクト名+"0"が最初のルートオブジェクトの名前として自動で定義される。
+
+--io.deleteIObj(iオブジェクト名[,削除するオブジェクトの変数の数])
+大iオブジェクトひとつをまるごと削除する。
+関連のグローバル変数が全て削除される。
+iObjDicから該当の項目が削除される。
+当該のiオブジェクトの名前がiObjDicに入っていないと実行されない。
+第二変数に整数xを入力すると、iObjDicでの登録の有無にかかわらず、関係する名前のデータが削除される。
+「iオブジェクト名+序数」という形のグローバル変数が、「iオブジェクト名0～iオブジェクト名x」の範囲で削除される。
+void型で出力はない。
+
+--io.addItem(起点となるオブジェクトの変数名,入れる変数値,キー1[,キー2,....]):
+オブジェクト中のキーのアドレスに新しい値を挿入する。
+起点となるオブジェクトはルートオブジェクトでなくても良い。
+入れる変数は文字列や、整数などのプリミティブな単一データでなくてはならず、汎用配列やiオブジェクトを入れることはできない。
+挿入にあたって間のオブジェクトがなければ自動で作成する。
+配列に新しい値を挿入したい場合、当該箇所のキーを"-1"とすると、勝手に都合のよいキーをつけて値を挿入する。
+例えば前述の例に置いていえば、
+io.addItem("IOBJ.Sample0","うにゅう","友達",0,"名前")
+と書けば、"友達"の配列(IOBJ.Sample1)を自動で作成して友達の1人目として"うにゅう"が入れられる。
+
+--io.addRoot(iオブジェクト名):
+iオブジェクト中に新しいルートオブジェクトを作成する。
+作成されたルートオブジェクトの名前(文字列)を返却する。
+
+--io.removeRoot(ルートオブジェクト名)
+ルートオブジェクトを削除する。[大iオブジェクト名]RootDicからも削除される。
+ルートオブジェクトの下位の階層の変数もまとめて削除される。
+ただし、[大iオブジェクト名]Lenの値は変わらない。
+
+--io.putIObj(親側の起点となるオブジェクトの変数名, 挿入するルートオブジェクトの変数名, キー1[,キー2,....])
+第一引数はルートオブジェクト以外を指定しても良いが第二引数はルートオブジェクトを指定しなければならない。
+第一引数のオブジェクトから第三引数以降で記載したアドレスを辿った場所に第二引数のルートオブジェクトを格納する。
+つまり、オブジェクトの中に他のオブジェクトを挿入するための関数。
+挿入されたルートオブジェクトはルートオブジェクトではなくなり、~~RootDicからも削除される。
+
+
+--js.showIObj(起点となるオブジェクトの変数名)
+第一引数のオブジェクトのjavascriptのオブジェクトライクな表記を作成し返す。
+(ただし細かい点でいろいろちがう。)
+
+
+*/
+
+//testIObj()
+//-----------iObjが正しく動作するかのチェック用です。
+testIObj{
+	_className="IOBJ.MoonSchool"
+	io.deleteIObj(_className)
+
+	_x=io.createIObj(_className)
+	_className0=_className+"0"
+	_classNamelen=_className+"Len"
+	_root=(IARRAY(),_className0)
+	LOGGING("testIObjのログを表示します=============================================")
+	_x,="iObjDic: "+IOBJ.dic
+	_x,="_classNamelen: "+_classNamelen
+	_x,="_classNamelen: "+EVAL(_classNamelen)
+	_x,="_addItem:"+io.addItem(_root[0],"莉子",-1,"名前")
+	_x,="_addItem:"+io.addItem(_root[0],"かわいい女の子",0,"特徴")
+	_x,="_addItem:"+io.addItem(_root[0],"メス",0,"性別")
+	_x,="_addItem:"+io.addItem(_root[0],"リュドニー",-1,"名前")
+	_x,="_addItem:"+io.addItem(_root[0],"こわい妖精",1,"特徴")
+	_x,="_addItem:"+io.addItem(_root[0],"良子",2,"名前")
+	_x,="_addItem:"+io.addItem(_root[0],"眠そうな不良",2,"特徴")
+	_x,="_addItem:"+io.addItem(_root[0],"レヴェナ",3,"名前")
+	_x,="_addItem:"+io.addItem(_root[0],"優雅な幽霊",3,"特徴")
+	_root,=io.addRoot(_className)
+	_x,="_addItem:"+io.addItem(_root[1],"ドド","動物たち",-1,"名前")
+	_x,="_addItem:"+io.addItem(_root[1],"いつも何かにおびえているくま","動物たち",0,"特徴")
+	_x,="_addItem:"+io.addItem(_root[1],"メル","動物たち",1,"名前")
+	_x,="_addItem:"+io.addItem(_root[1],"目の大きな魚","動物たち",1,"特徴")
+	_x,="_addItem:"+io.addItem(_root[1],"ねみ","植物たち",0,"名前")
+	_x,="_addItem:"+io.addItem(_root[1],"豊満なチューリップ","植物たち",0,"特徴")
+	_x,="_addItem:"+io.addItem(_root[1],"ルル","植物たち",1,"名前")
+	_x,="_addItem:"+io.addItem(_root[1],"物静かな菊","植物たち",1,"特徴")
+	_root,=io.addRoot(_className)
+	_x,=io.putIObj(_root[1],_root[0],"生徒たち")
+	_x+="\n"
+//	LOGGING("_root[1]:"+_root[1])
+//	LOGGING("_root[1]:"+EVAL(_root[1]))
+
+
+
+	LOGGING(_x)
+	"\b[4]"+js.showIObj(_root[1])
+}
+
+io.iObj2{
+	_items=io.cutStrInt(_argv[0])
+	_objName=_items[0]
+	_objIdx=_items[1]
+	_input=_argv
+	_node=EVAL(_argv[0])
+	for _j=0;_j<ARRAYSIZE(_node);_j+=3{
+		_item=(_node[_j],_node[_j+1],_node[_j+2])
+		if _item[0]==_argv[1] {
+			if _item[1]=="value"{
+				(_item[1],_item[2])
+			}elseif _argc==2{
+				(_item[1],_item[2])
+			}else{
+				_input[1]=IARRAY()
+				_input[0]=_item[2]
+				io.iObj2(_input)
+			}
+			break
+		}
+	}
+}
+io.iObj{
+//---------オブジェクトの値にアクセス、値、もしくはそのアドレスのオブジェクトの名前を返却する。
+//	-------_argv[0]は、ノードの変数の名前。例："IOBJ.Sample0"
+//	-------_argv[1]以降は、キーの配列。例："友達","名前"
+//  ------辞書の要素を検索。（キーは、_argv[1]以降に記述。）
+	_items=io.cutStrInt(_argv[0])
+	_objName=_items[0]
+	_objIdx=_items[1]
+	_input=_argv
+	// _node=EVAL(_argv[0])
+	LETTONAME( '_node' , EVAL(_argv[0]) )
+	for _j=0;_j<ARRAYSIZE(_node);_j+=3{
+		_item=(_node[_j],_node[_j+1],_node[_j+2])
+		if _item[0]==_argv[1] {
+			if _item[1]=="value"{
+				_item[2]
+			}elseif _argc==2{
+				_text=_item[2]
+				_text
+			}else{
+				_input[1]=IARRAY()
+				_input[0]=_item[2]
+				io.iObj(_input)
+			}
+			break
+		}
+	}
+}
+io.createIObj{
+//--------新しいオブジェクトを定義。
+//--------条件を満たすかを確認。
+//_argv[0]は辞書名
+	_name=_argv[0]
+	_goodName=RE_MATCH(_name,'IOBJ.[a-zA-Z_]+')
+	_used=GETTYPEEX(_name)+GETTYPEEX(_name+"0")
+	_finishWithLEN=RE_MATCH(_name,'\w*Len')
+	_finishWithROOTDIC=RE_MATCH(_name,'\w*RootDic')
+	LOGGING("_finishWithROOTDIC: "+_finishWithROOTDIC)
+	LOGGING("_finishWithLEN: "+_finishWithLEN)
+	LOGGING("_used: "+_used)
+	if _goodName&&!_used&&!_finishWithLEN&&!_finishWithROOTDIC {
+		if !GETTYPEEX("IOBJ.dic"){
+			IOBJ.dic=IARRAY()
+		}
+		IOBJ.dic,=_name
+		EVAL(_name+"0=IARRAY()")
+		EVAL(_name+"Len=1")
+		EVAL(_name+"RootDic=(IARRAY(),0)")
+		1
+		LOGGING("createIObj:OK")
+	}else{
+		LOGGING("createIObj:error")
+		LOGGING("_finishWithROOTDIC: "+_finishWithROOTDIC)
+		LOGGING("_finishWithLEN: "+_finishWithLEN)
+		LOGGING("_used: "+_used)
+		0
+	}
+
+}
+io.addItem{
+//	_argv[0]は、ノードの変数の名前
+//	_argv[1]は、入れたい変数
+//	_argv[2]以降は、入れたい場所(-1だとインデックスをキーで追加で格納)
+//	成功したら値を格納した親のオブジェクトの名前を返す。
+//例：io.addItem("jsonData","2020-02-26T03:05:02+09:00","data",0,"startTime")
+//jsonDataの所定の場所に日付データを入れる。
+//
+	_input=_argv
+	LOGGING("addItem--")
+	LOGGING("引数:"+_argv)
+	_strInt=io.cutStrInt(_input[0])
+	_objName=_strInt[0]
+	_objIdx=_strInt[1]
+	if GETTYPEEX(_argv[0])&&ASEARCH(_objName,IOBJ.dic)!=-1{
+		_node=EVAL(_argv[0])
+		_flag=0
+		if _argv[2]==-1{
+			_input[2]=TOINT(ARRAYSIZE(_node)/3)
+//			LOGGING("_arrayIdx:"+_input[2])
+		}else{
+			for _j=0;_j<ARRAYSIZE(_node);_j+=3{
+
+				_item=(_node[_j],_node[_j+1],_node[_j+2])
+				if _item[0]==_input[2] {
+
+					if _argc==3 {
+//						LOGGING("input:"+_input)
+						_key=_input[2]
+						_keytype=GETTYPEEX("_key")
+						_type="value"
+						EVAL(_argv[0]+"[_j+2]=_argv[1]")
+						EVAL(_argv[0]+'[_j+1]="value"')
+						_argv[0]
+					}else{
+						_input[2]=IARRAY
+						_input[0]=_item[2]
+						_x=io.addItem(_input)
+					}
+					_flag=1
+					break
+				}
+			}
+		}
+		_x=0
+		while _flag==0{
+			_node=EVAL(_input[0])
+			if _input[2]==-1{
+				_input[2]=TOINT(ARRAYSIZE(_node)/3)
+//				LOGGING("_arrayIdx:"+_input[2])
+			}
+//			LOGGING("input:"+_input)
+			_key=_input[2]
+			_keytype=GETTYPEEX("_key")
+//			LOGGING("keytype:"+_keytype)
+			if ARRAYSIZE(_input)==3{
+				EVAL(_input[0]+',=(_input[2],"value",_input[1])')
+				_flag=1
+				_argv[0]
+				break
+			}else{
+				_iObjlen=_objName+"Len"
+				_len=EVAL(_iObjlen)
+				_sonName=_objName+_len
+				EVAL(_input[0]+',=(_input[2],"object",_sonName)')
+				EVAL(_sonName+"=IARRAY()")
+				EVAL(_iObjlen+"++")
+				_input[0]=_sonName
+				_input[2]=IARRAY()
+			}
+		}
+	}else{
+//		LOGGING("addItem:引数が不正です。")
+//		LOGGING("引数の型: "+GETTYPEEX(_argv[0]))
+	}
+}
+io.addRoot{
+	//----_argv[0]はiObjの名前
+	//返り値は
+	_objName=_argv[0]
+	if ASEARCH(_objName,IOBJ.dic)!=-1{
+		LOGGING("io.addRoot:OK")
+		_iObjlen=EVAL(_objName+"Len")
+		_newRootName=_objName+_iObjlen
+		EVAL(_objName+"Len++")
+		EVAL(_newRootName+"=IARRAY()")
+		_newRootName
+		EVAL(_objName+"RootDic ,=_iObjlen")
+	}else{
+		LOGGING("io.addRoot:false")
+		}
+}
+io.removeRoot : void{
+	//----_argv[0]は削除するルート
+	//
+	//返り値は
+	_node=_argv[0]
+	_strInt=io.cutStrInt(_argv[0])
+	_objName=_strInt[0]
+	_objRootId=_strInt[1]
+
+	if ASEARCH(_objName,IOBJ.dic)!=-1{
+		_rootDic=_objName+"RootDic"
+		_rootDicId=ASEARCH(_objRootId,EVAL(_rootDic))
+		if _rootDicId!=-1{
+			io.eraseIObjInner(_argv)
+
+		}
+	}
+}
+io.eraseItemInList{
+	_nodeName=_argv[0]
+	for _i=0;_i<io.iObjSize(_nodeName);_i++{
+		if EVAL(_nodeName+"["+_i*3+"]")==_argv[1]{
+			io.eraseIObjInner(EVAL(_nodeName+"["+(_i*3+2)+"]"))
+			EVAL(_nodeName+"["+_i*3+","+(_i*3+2)+"]=IARRAY()")
+		}
+	}
+}
+io.eraseIObjInner{
+	_node=EVAL(_argv[0])
+	_strInt=io.cutStrInt(_argv[0])
+	_objName=_strInt[0]
+	_objRootId=_strInt[1]
+	_rootDic=_objName+"RootDic"
+	_iObjlen=_objName+"Len"
+	_rootDicId=ASEARCH(_objRootId,EVAL(_rootDic))
+	for _i=0;_i<ARRAYSIZE(_node);_i+=3{
+		if _node[_i+1]=="object"{
+			io.eraseIObjInner(_node[_i+2])
+		}
+	}
+	ERASEVAR(_argv[0])
+	EVAL(_iObjlen+"--")
+	if _rootDicId!=-1{
+		EVAL(_rootDic+"[_rootDicId]=IARRAY")
+	}
+}
+io.putIObj{
+//	_argv[0]は、親のノードの名前
+//	_argv[1]は、入れたいオブジェのルートの名前。(そのiObjのrootDic配列にすでに格納のこと)
+//	_argv[2]以降はパス
+//	成功したらその挿入されたノード名を返す。
+	LOGGING("io.putIObj---------")
+	LOGGING("argv:" +_argv)
+	_sonIObj=_argv[1]
+	_parentIObj=_argv[0]
+	_items=io.cutStrInt(_sonIObj)
+	_sonIObjName=_items[0]
+	_sonIObjIdx=_items[1]
+	_objRootDic=EVAL(_sonIObjName+"RootDic")
+	_items=io.cutStrInt(_parentIObj)
+	_parentIObjName=_items[0]
+	_parentIObjIdx=_items[1]
+	if ASEARCH(_sonIObjName,IOBJ.dic)!=-1&&ASEARCH(_sonIObjIdx,_objRootDic)!=-1&&(_parentIObjName==_sonIObjName){
+		io.commitPutIObj(_argv)
+
+	}
+}
+io.commitPutIObj{
+//	LOGGING("commitPut:")
+//	LOGGING("_input:"+_argv)
+	_input=_argv
+	_strInt=io.cutStrInt(_argv[0])
+	_objName=_strInt[0]
+	_objIdx=_strInt[1]
+	_strInt=io.cutStrInt(_argv[1])
+	_sonIObjName=_strInt[0]
+	_sonIObjIdx=_strInt[1]
+	_node=EVAL(_argv[0])
+	_flag=0
+	if _argv[2]==-1{
+		_input[2]=TOINT(ARRAYSIZE(_node)/3)
+	}else{
+		for _j=0;_j<ARRAYSIZE(_node);_j+=3{
+			_item=(_node[_j],_node[_j+1],_node[_j+2])
+			if _item[0]==_input[2] {
+				if _argc==3 {
+					EVAL(_argv[0]+"[_j+2]=_argv[1]")
+					EVAL(_argv[0]+'[_j+1]="object"')
+					io.removeIObjRootDic(_objName,_sonIObjIdx)
+					_argv[0]		//------代入
+				}else{
+					_input[2]=IARRAY()
+					_input[0]=_item[2]
+					io.commitPutIObj(_input)
+				}
+				_flag=1
+				break
+			}
+		}
+	}
+	while _flag!=1{
+		_node=EVAL(_input[0])
+		if _input[2]==-1{
+			_input[2]=TOINT(ARRAYSIZE(_node)/3)
+//			LOGGING("_arrayIdx:"+_input[2])
+		}
+		if ARRAYSIZE(_input)==3{
+			EVAL(_input[0]+',=(_input[2],"object",_input[1])')
+			io.removeIObjRootDic(_objName,_sonIObjIdx)
+			_flag=1
+			_input[0]		//--------挿入
+			break
+		}else{
+			_iObjlen=_objName+"Len"
+			_len=EVAL(_iObjlen)
+			_sonName=_objName+_len
+			EVAL(_input[0]+',=(_input[2],"object",_sonName)')
+			EVAL(_sonName+"=IARRAY()")
+			EVAL(_iObjlen+"++")
+			_input[0]=_sonName
+			_input[2]=IARRAY()
+		}
+	}
+}
+io.deleteIObj : void{
+	_objName=_argv[0]
+	_iObjDicIdx=ASEARCH( _objName , IOBJ.dic)
+	_switch=0
+	if _iObjDicIdx!=-1{
+		_switch=1
+	}
+
+	_lenArg=0
+	if _argc==2{
+		_lenArg=_argv[1]
+		_switch=1
+	}
+	if _switch{
+		_iObjlen=_objName+"Len"
+		_len=EVAL(_iObjlen)
+		if _len<_lenArg{
+			_len=_lenArg
+		}
+		_ids=IARRAY()
+		for _i=0;_i<_len;_i++{
+			_ids,=_objName+_i
+		}
+		ERASEVAR(_ids,_objName+"Len",_objName+"RootDic")
+		IOBJ.dic[_iObjDicIdx]=IARRAY()
+	}
+}
+
+js.iObjToJson{
+	_in=""
+	_format=0
+	if _argc>=2{
+		if _argv[1]==1{
+			_format=1
+		}
+		if _argc>=3{
+			_in=_argv[2]
+		}
+	}
+	_lineFeedArray=("","\n")
+	_lineFeed=_lineFeedArray[_format]
+
+	_objRootName=_argv[0]
+	_objRoot=EVAL(_objRootName)
+	_x=""
+	_objType=0
+	if (ARRAYSIZE(_objRoot)>0){
+		_t=_objRoot[0]
+		if (GETTYPEEX("_t")!=3){
+			_objType=1
+		}
+	}
+	_bracket=("{","[","}","]")
+	_x+=_bracket[_objType]+_lineFeed
+	if _format==1{
+		_in+="  "
+	}
+	LOGGING(ARRAYSIZE(_objRoot))
+	for _i=0;_i<ARRAYSIZE(_objRoot);_i+=3{
+		_t=_objRoot[_i]
+		_keyType=GETTYPEEX("_t")
+			_x+=_in
+		if (_keyType!=1){
+			_x+='"'+_objRoot[_i]+'": '
+		}
+
+		if _objRoot[1+_i]=="value"{
+			_t=_objRoot[2+_i]
+			if (GETTYPEEX("_t")==3){
+				_x+='"'+_objRoot[2+_i]+'"'
+			}else{
+				_x+=_objRoot[2+_i]
+			}
+		}else{
+			_x+=js.iObjToJson(_objRoot[_i+2],_format,_in)
+		}
+		if _i+3<ARRAYSIZE(_objRoot){
+			_x+=","+_lineFeed
+		}else{
+			_x+=_lineFeed
+		}
+	}
+	_in=ERASE(_in,-2,2)
+	_x+=_in+_bracket[2+_objType]
+	_x
+}
+js.showIObj{
+	js.iObjToJson(_argv[0],1)
+}
+io.cutStrInt{
+	_array=RE_REPLACEEX(_argv[0],'([a-zA-Z_]+)(\d+)','$1,$2')
+
+	(_array[0],_array[1])
+}
+io.removeIObjRootDic : void{
+	_objName=_argv[0]
+	_objRootDic=EVAL(_objName+"RootDic")
+	_idx=_argv[1]
+	EVAL(_objName+"RootDic[ASEARCH(_idx,_objRootDic)]=IARRAY()")
+}
+io.iObjSize{
+	_iObjName=_argv[0]
+	ARRAYSIZE(EVAL(_iObjName))/3
+}

@@ -1,0 +1,143 @@
+//******************************************************************************
+// YAYA　ゴーストテンプレート
+// 起動/終了トーク辞書
+//******************************************************************************
+
+//******************************************************************************
+//通常の起動 OnBoot
+//******************************************************************************
+OnBoot
+{
+	ScriptHeadSimple
+	--
+	OnBalloonInfoGetExec
+	--
+	'\e'
+}
+
+//******************************************************************************
+//終了 OnClose
+//******************************************************************************
+OnClose
+{
+	'\-\e'
+}
+
+//******************************************************************************
+//最小化と復帰
+//******************************************************************************
+OnWindowStateMinimize
+{
+	'\![timerraise,0,1,OnWeatherInfoRequest]'
+	//情報取得の予約を取り消す
+}
+
+OnWindowStateRestore
+{
+	if IsDisplay == 1 {
+		OnWeatherView
+	}
+}
+
+//******************************************************************************
+//ゴースト起動時の処理
+//******************************************************************************
+OnGhostLoad
+{
+	//起動ごとに初期化する変数
+	IsDisplay = 1
+	LastTickTime_GetWeatherInfo = 0
+
+	//変数が無かったら初期値をセットしておく
+	if ISVAR('LastTime_GetWeatherInfo') == 0 { LastTime_GetWeatherInfo = 0 }
+	if ISVAR('GeoCoordinates') == 0 {
+		GeoCoordinates = ( TOREAL( GeoList_Japan[12][2] ) , TOREAL( GeoList_Japan[12][3] ) )
+		GeoName = ( GeoList_Japan[12][0] , GeoList_Japan[12][1] )
+	}
+	if ISVAR('GeoName') == 0 { GeoName = '' }
+	if ISVAR('TimeMode') == 0 { TimeMode = 0 }
+	if ISVAR('TimeOffset') == 0 { TimeOffset = 1 }
+	if ISVAR('TimeSpecified') == 0 { TimeSpecified = GETSECCOUNT() }
+	if ISVAR('ColorTheme') == 0 { ColorTheme = (2,'黒') }
+	if ISVAR('CurrentBalloon_ValidWidth') == 0 { CurrentBalloon_ValidWidth = 312 }
+	if ISVAR('CurrentBalloon_ValidHeight') == 0 { CurrentBalloon_ValidHeight = 142 }
+	if ISVAR('CurrentBalloon_Lines') == 0 { CurrentBalloon_Lines = 10 }
+	if ISVAR('CurrentBalloon_CharWidth') == 0 { CurrentBalloon_CharWidth = 6 }
+	if ISVAR('CurrentBalloon_SingleLineLength') { CurrentBalloon_SingleLineLength = TOINT( ( CurrentBalloon_ValidWidth / CurrentBalloon_CharWidth ) - 7 ) }
+	if ISVAR('Result_Mode0') == 0 { Result_Mode0 = IARRAY }
+	if ISVAR('Result_Mode1') == 0 { Result_Mode1 = IARRAY }
+	if ISVAR('Result_Mode2') == 0 { Result_Mode2 = IARRAY }
+	if ISVAR('IsInfoTime') == 0 { IsInfoTime = 'current' }
+	if ISVAR('IsWaitingWeatherInfoRequest') == 0 { IsWaitingWeatherInfoRequest = 0 }
+}
+
+//******************************************************************************
+//ゴースト終了時の処理
+//******************************************************************************
+OnGhostUnload
+{
+	if ISVAR('IOBJ.JsonData0')==1 {
+		for _c=0; _c<IOBJ.JsonDataLen; _c++ {
+			ERASEVAR( 'IOBJ.JsonData' + _c )
+		}
+	}
+
+	ERASEVAR( 終了時に消す変数名のリスト )
+}
+
+終了時に消す変数名のリスト : array
+{
+	'TimeOffset_Date'
+	'TimeSpecified_Date'
+	'IOBJ.dic'
+	'IOBJ.JsonDataLen'
+	'IOBJ.JsonDataRootDic'
+	'AYATEMPLATE.installedplugin_name'
+	'AYATEMPLATE.installedplugin_id'
+	'SHIORI3FW.ShellNameOld'
+	'SHIORI3FW.ShellName'
+	'SHIORI3FW.ShellPath'
+	'SHIORI3FW.BalloonNameOld'
+	'SHIORI3FW.BalloonName'
+	'SHIORI3FW.BalloonPath'
+}
+
+//******************************************************************************
+//バルーン情報取得
+//******************************************************************************
+OnBalloonChange
+{
+	OnBalloonInfoGetExec
+}
+
+OnBalloonInfoGetExec
+{
+	if basewarename == 'SSP' {
+		'\![get,property,OnBalloonInfoGet,currentghost.balloon.scope(0).validwidth.initial,currentghost.balloon.scope(0).validheight.initial,currentghost.balloon.scope(0).lines.initial,currentghost.balloon.scope(0).char_width]'
+	}
+	elseif IsDisplay == 1 {
+		OnWeatherView
+	}
+}
+
+OnBalloonInfoGet
+{
+	CurrentBalloon_ValidWidth = TOINT( reference[0] )
+	CurrentBalloon_ValidHeight = TOINT( reference[1] )
+	CurrentBalloon_Lines = TOINT( reference[2] )
+	CurrentBalloon_CharWidth = TOINT( reference[3] )
+	
+	CurrentBalloon_SingleLineLength = TOINT( ( CurrentBalloon_ValidWidth / CurrentBalloon_CharWidth ) - 7 )
+	//プロポーショナルフォントの場合もある
+
+	if IsDisplay == 1 {
+		OnWeatherView
+	}
+}
+
+OnNotifyInternationalInfo
+{
+	CurrentUtcOffsetSec = TOINT(reference[0])*60
+}
+
+

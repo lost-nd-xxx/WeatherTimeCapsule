@@ -1,0 +1,906 @@
+//******************************************************************************
+// YAYA　ゴーストテンプレート
+// メニュー処理辞書
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+//メインメニュー展開
+//------------------------------------------------------------------------------
+OnMenu
+{
+	IsDisplay = 1
+
+	_geo = ''
+	if ISVAR('GeoCoordinates') == 0 {
+		_geo = '未設定'
+	}
+	else {
+		if STRLEN( GeoName ) > 0 { _geo = '都市: ' + GeoName[0] + ' ' + GeoName[1] }
+		else {
+			_geo += '緯度:' + GeoCoordinates[1]
+			_geo += ', 経度:' + GeoCoordinates[0]
+		}
+	}
+
+	_mode = 'モード: '
+	if ISVAR('TimeMode') == 0 {
+		_mode += '未設定'
+	}
+	elseif TimeMode == 0 {
+		_mode += '現時刻'
+	}
+	elseif TimeMode == 1 {
+		_mode += '相対時刻'
+		_text = SecToTimeOffset( TimeOffset )
+		if STRLEN(_text)>0 { _mode += ': ' + _text }
+	}
+	elseif TimeMode == 2 {
+		_mode += '固定時刻: ' + SecToTimeText( TimeFixed )
+		//WIP 読みやすく加工する
+	}
+
+	_t = ''
+	
+	_length = CurrentBalloon_SingleLineLength - 4
+
+	_t += '\![*]\__q[OnGeoCoordinatesSelect]'
+	_t += SHIORI3FW.MakeJustText('緯度経度',_length)
+	_t += '\__q\n'
+	
+	_t += _geo
+	_t += '\n[150]'
+	
+	_t += '\![*]\__q[OnTimeModeSelect]'
+	_t += SHIORI3FW.MakeJustText('時刻',_length)
+	_t += '\__q\n'
+	
+	_t += _mode
+	_t += '\n[150]'
+	
+	_BalloonDir = SPLIT( SHIORI3FW.BalloonPath , '/' , 0 )
+	_BalloonDir = _BalloonDir[ARRAYSIZE(_BalloonDir)-2]
+	if STRSTR( SHIORI3FW.BalloonName , 'WeatherTimeCapsule' , 0 ) >= 0 || STRSTR( _BalloonDir , 'WeatherTimeCapsule' , 0 ) >= 0 {
+		_t += '\![*]\__q[OnColorThemeSelect,1]'
+		_t += SHIORI3FW.MakeJustText('背景色の変更',_length)
+		_t += '\__q\n'
+		_t += '設定中: ' + ColorTheme[1]
+	}
+	else {
+		_t += '\![*]'
+		_t += '\f[strike,1]背景色の変更\f[strike,0]\n'
+		_t += '非対応バルーン使用中'
+	}
+	_t += '\n[150]'
+
+	_t += '\![*]\__q[script:"\![open,readme]\![raise,OnMenu]"]'
+	_t += SHIORI3FW.MakeJustText('readmeを開く',_length)
+	_t += '\__q\n'
+	_t += '操作説明、使用素材のライセンス等'
+	
+	ScriptHead
+	--
+	'\![timerraise,0,1,OnWeatherInfoRequest]'
+	//情報取得の予約を取り消す
+	--
+	_t + CloseMenu + '\e'
+}
+
+CloseMenu
+{
+	'\_l[0,0]\f[align,right]\f[height,150%]'
+	--
+	if _argc > 0 { '\__q[OnMenu]\_u[0x1F519]\__q' }
+	--
+	'\__q[OnMenu_CANCEL]\_u[0x1F51D]\__q'
+}
+
+//******************************************************************************
+//各項目の処理内容
+//******************************************************************************
+
+OnMenu_CANCEL
+{
+	IsDisplay = 1
+	OnWeatherView
+}
+
+OnMenu_Close
+{
+	IsDisplay = 0
+	'\e'
+}
+
+List_Pager
+{
+	_JumpTo = _argv[0]
+	_CurrentPage = _argv[1]
+	_LastPage = _argv[2]
+	_t=''
+
+	_ref = ''
+	if _argc > 3 {
+		for _c=3; _c<_argc; _c++ {
+			_ref += ',' + _argv[_c]
+		}
+	}
+
+	_PagerStart = _CurrentPage
+	_PagerEnd = _CurrentPage
+	if CurrentBalloon_SingleLineLength < 24 {
+		if _LastPage > 3 {
+			_PagerStart = _CurrentPage - 1
+			_PagerEnd = _CurrentPage + 1
+			if _PagerStart <= 0 {
+				_PagerStart = 1
+				_PagerEnd = 3
+			}
+			if _PagerEnd > _LastPage {
+				_PagerEnd = _LastPage
+				_PagerStart = _PagerEnd - 2
+			}
+		}
+		else {
+			_PagerStart = 1
+			_PagerEnd = _LastPage
+		}
+	}
+	else {
+		if _LastPage > 5 {
+			_PagerStart = _CurrentPage - 2
+			_PagerEnd = _CurrentPage + 2
+			if _PagerStart <= 0 {
+				_PagerStart = 1
+				_PagerEnd = 5
+			}
+			if _PagerEnd > _LastPage {
+				_PagerEnd = _LastPage
+				_PagerStart = _PagerEnd - 4
+			}
+		}
+		else {
+			_PagerStart = 1
+			_PagerEnd = _LastPage
+		}
+	}
+
+	if _CurrentPage >= 3 {
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += "\__q[%(_JumpTo),1%(_ref)]≪\__q"
+		}
+		else {
+			_t += "\__q[%(_JumpTo),1%(_ref)] ≪ \__q"
+		}
+	}
+	else {
+		_t += '\f[color,disable]'
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += '≪'
+		}
+		else {
+			_t += ' ≪ '
+		}
+		_t += '\f[color,default]'
+	}
+
+	if _CurrentPage >= 2 {
+		_c = _CurrentPage - 1
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += "\__q[%(_JumpTo),%(_c)%(_ref)]＜\__q"
+		}
+		else {
+			_t += "\__q[%(_JumpTo),%(_c)%(_ref)] ＜ \__q"
+		}
+	}
+	else {
+		_t += '\f[color,disable]'
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += '＜'
+		}
+		else {
+			_t += ' ＜ '
+		}
+		_t += '\f[color,default]'
+	}
+	
+	if CurrentBalloon_SingleLineLength < 24 {
+		if _LastPage > 3 && _CurrentPage >= 3 { _t += '..' }
+		elseif _LastPage > 3 { _t += '  ' }
+	}
+	else {
+		if _LastPage > 5 && _CurrentPage >= 4 { _t += '.. ' }
+		elseif _LastPage > 5 { _t += '   ' }
+	}
+
+	for _c=_PagerStart; _c<=_PagerEnd; _c++ {
+		_str = '$0' + STRLEN(_LastPage) + 'd'
+		_str = STRFORM( _str, _c )
+		
+		if _c != _CurrentPage {
+			if CurrentBalloon_SingleLineLength < 24 {
+				_t += "\__q[%(_JumpTo),%(_c)%(_ref)]%(_str)\__q"
+			}
+			else {
+				_t += "\__q[%(_JumpTo),%(_c)%(_ref)] %(_str) \__q"
+			}
+		}
+		else {
+			_t += '\f[color,disable]'
+			if CurrentBalloon_SingleLineLength < 24 {
+				_t += "%(_str)"
+			}
+			else {
+				_t += " %(_str) "
+			}
+			_t += '\f[color,default]'
+		}
+	}
+
+	if CurrentBalloon_SingleLineLength < 24 {
+		if _LastPage > 3 && _PagerEnd < _LastPage { _t += '..' }
+		elseif _LastPage > 3 { _t += '  ' }
+	}
+	else {
+		if _LastPage > 5 && _PagerEnd < _LastPage { _t += '.. ' }
+		elseif _LastPage > 5 { _t += '   ' }
+	}
+
+	if ( _CurrentPage + 1 ) <= _LastPage {
+		_c = _CurrentPage + 1
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += "\__q[%(_JumpTo),%(_c)%(_ref)]＞\__q"
+		}
+		else {
+			_t += "\__q[%(_JumpTo),%(_c)%(_ref)] ＞ \__q"
+		}
+	}
+	else {
+		_t += '\f[color,disable]'
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += '＞'
+		}
+		else {
+			_t += ' ＞ '
+		}
+		_t += '\f[color,default]'
+	}
+
+	if ( _CurrentPage + 2 ) <= _LastPage {
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += "\__q[%(_JumpTo),%(_LastPage)%(_ref)]≫\__q"
+		}
+		else {
+			_t += "\__q[%(_JumpTo),%(_LastPage)%(_ref)] ≫ \__q"
+		}
+	}
+	else {
+		_t += '\f[color,disable]'
+		if CurrentBalloon_SingleLineLength < 24 {
+			_t += '≫'
+		}
+		else {
+			_t += ' ≫ '
+		}
+		_t += '\f[color,default]'
+	}
+
+	'\_n' + _t + '\_n'
+}
+
+//---- 緯度経度設定
+OnGeoCoordinatesSelect
+{
+	_t = ''
+	_length = CurrentBalloon_SingleLineLength
+	
+	_t += '\f[bold,1]緯度経度\f[bold,0]\n'
+	
+	_geo = ''
+	if STRLEN( GeoName ) > 0 { _geo = GeoName[0] + ' ' + GeoName[1] + '\n' }
+	_geo += '緯度:' + GeoCoordinates[1]
+	_geo += ', 経度:' + GeoCoordinates[0]
+
+	_t += _geo + '\n[150]'
+	
+	_t += '一覧から選択\n'
+	_t += '\![*]\__q[OnGeoCoordinatesSelect_List,1,World]'
+	_t += SHIORI3FW.MakeJustText('世界の首都',TOINT(_length/2))
+	_t += '\__q'
+	_t += '\![*]\__q[OnGeoCoordinatesSelect_List,1,Japan]'
+	_t += SHIORI3FW.MakeJustText('日本の県庁所在地',TOINT(_length/2))
+	_t += '\__q\n[150]'
+	
+	_t += '\![*]\__q[OnGeoCoordinatesSelect_InputExec]'
+	_t += SHIORI3FW.MakeJustText('手動で入力',_length)
+	_t += '\__q'
+	
+	ScriptHead
+	--
+	_t
+	--
+	CloseMenu(1)
+	--
+	'\e'
+}
+
+OnGeoCoordinatesSelect_List
+{
+	_CurrentList = reference[1]
+	_CurrentPage = reference[0]
+	_LastPage = _CurrentPage
+	_t = ''
+
+	_list = IARRAY
+	if reference[1] == 'World' {
+		_list = GeoList_World
+	}
+	else {
+		_list = GeoList_Japan
+	}
+
+	_size = ARRAYSIZE( _list )
+	_lines = CurrentBalloon_Lines - 2
+
+	ScriptHead
+	--
+	if _CurrentList == 'World' {
+		'\_n緯度経度を世界の首都から選択中..\_n\n'
+	}
+	else {
+		'\_n緯度経度を日本の県庁所在地から選択中..\_n\n'
+	}
+	--
+	if _CurrentList == 'World' {
+		//世界のリスト 1列固定
+		_MaxCountPerPage = _lines
+		_LastPage = TOINT( _size / _MaxCountPerPage )
+		if ( _size % _MaxCountPerPage ) > 0 {
+			_LastPage++
+		}
+
+		_start = _MaxCountPerPage * ( _CurrentPage - 1 )
+		_end = _start + _MaxCountPerPage
+		if _end >= _size { _end = _size }
+
+		for _num=_start; _num<_end; _num++; {
+			_length = TOINT( CurrentBalloon_SingleLineLength / 2 - 1 )
+			_name1 = SHIORI3FW.MakeJustText( GeoList_World[_num][0] , _length )
+			_name2 = SHIORI3FW.MakeJustText( GeoList_World[_num][1] , _length )
+
+			_t += "\![*]\__q[OnGeoCoordinatesSelect_Set,%(_CurrentList),%(_num),%(_CurrentPage)]"
+			_t += _name1 + ' ' + _name2
+			_t += '\__q\n'
+		}
+	}
+	else {
+		//日本のリスト
+		_CurrentList = 'Japan'
+
+		if CurrentBalloon_SingleLineLength >= 38 {
+			//半角38文字以上描画できるなら2列にする
+			_MaxCountPerPage = _lines * 2
+			_LastPage = TOINT( _size / _MaxCountPerPage )
+			if ( _size % _MaxCountPerPage ) > 0 {
+				_LastPage++
+			}
+
+			_start = _MaxCountPerPage * ( _CurrentPage - 1 )
+			_end = _start + _MaxCountPerPage
+			if _end > _size { _end = _size }
+			
+			_columns = 1
+			if ( _end - _start ) > _lines {
+				_columns = 2
+			}
+
+			_num = _start
+
+			for _c=0; _c<_lines&&_num<_end; _c++, _num++; {
+				_t += "\![*]\__q[OnGeoCoordinatesSelect_Set,%(_CurrentList),%(_num)]"
+				_t += GeoList_Japan[_num][0] + GeoList_Japan[_num][1]
+				_t += '\__q\n'
+			}
+
+			if _columns > 1 {
+				--
+				_t += '\_l[0,0]\n'
+				--
+				for _c=0; _num<_end; _num++; {
+					_t += "\_l[10em,]\![*]\__q[OnGeoCoordinatesSelect_Set,%(_CurrentList),%(_num)]"
+					_t += GeoList_Japan[_num][0] + GeoList_Japan[_num][1]
+					_t += '\__q\n'
+				}
+			}
+		}
+		else {
+			//1列にする
+			_MaxCountPerPage = _lines
+			_LastPage = TOINT( _size / _MaxCountPerPage )
+			if ( _size % _MaxCountPerPage ) > 0 {
+				_LastPage++
+			}
+			_start = _MaxCountPerPage * ( _CurrentPage - 1 )
+			
+			_end = _start + _MaxCountPerPage
+			if _end > _size { _end = _size }
+			
+			_num = _start
+
+			for _c=0; _c<_lines&&_num<_end; _c++, _num++; {
+				_t += "\![*]\__q[OnGeoCoordinatesSelect_Set,%(_CurrentList),%(_num)]"
+				_t += GeoList_Japan[_num][0] + GeoList_Japan[_num][1]
+				_t += '\__q\n'
+			}
+		}
+	}
+	--
+	_t
+	--
+	"\_l[0,%(CurrentBalloon_ValidHeight)]\_l[,@-1em]"
+	--
+	'\f[align,center]' + List_Pager( 'OnGeoCoordinatesSelect_List' , _CurrentPage , _LastPage , _CurrentList )
+	--
+	CloseMenu(1)
+	--
+	'\e'
+}
+
+OnGeoCoordinatesSelect_InputExec
+{
+	ScriptHead
+	--
+	'\![open,inputbox,OnGeoCoordinatesSelect_Input,--timeout=0]'
+	--
+	'入力ボックスを開いています。\n'
+	--
+	'緯度経度の数値を、\n'
+	--
+	'半角カンマ区切りで入力してください。\n[150]'
+	--
+	'\![*]\__q[script:"\![open,browser,https://www.google.com/maps/]\![raise,OnGeoCoordinatesSelect_InputExec]"]Googleマップを開く\__q\n'
+	--
+	'地図上で右クリックし、\n'
+	--
+	'上から１段目の数値を左クリックすると、\n'
+	--
+	'緯度経度がコピーされます。'
+	--
+	CloseMenu(1)
+	--
+	'\e'
+}
+
+OnGeoCoordinatesSelect_Input
+{
+	_t = TOSTR( reference[0] )
+	_t = REPLACE( _t , ' ' , '' , 0 )
+
+	if ISREALSTR(_t[0])==1&&ISREALSTR(_t[1])==1 {
+		GeoCoordinates = ( TOREAL(_t[1]) , TOREAL(_t[0]) )
+		GeoName=''
+		Result_Mode0 = IARRAY
+		Result_Mode1 = IARRAY
+		Result_Mode2 = IARRAY
+		OnGeoCoordinatesSelect
+	}
+	else {
+		ScriptHead
+		--
+		'数値として解釈できない値が入力されました。\x'
+		--
+		OnGeoCoordinatesSelect
+	}
+}
+
+OnGeoCoordinatesSelect_InputCancel
+{
+	OnGeoCoordinatesSelect
+}
+
+OnGeoCoordinatesSelect_Set
+{
+	_list = reference[0]
+	_num = TOINT( reference[1] )
+
+	if _list == 'World' {
+		GeoCoordinates = ( TOREAL( GeoList_World[_num][2] ) , TOREAL( GeoList_World[_num][3] ) )
+		GeoName = ( GeoList_World[_num][0] , GeoList_World[_num][1] )
+	}
+	else {
+		GeoCoordinates = ( TOREAL( GeoList_Japan[_num][2] ) , TOREAL( GeoList_Japan[_num][3] ) )
+		GeoName = ( GeoList_Japan[_num][0] , GeoList_Japan[_num][1] )
+	}
+
+	Result_Mode0 = IARRAY
+	Result_Mode1 = IARRAY
+	Result_Mode2 = IARRAY
+
+	OnGeoCoordinatesSelect
+}
+
+//---- 時刻のモード変更と設定
+OnTimeModeSelect
+{
+	_length = CurrentBalloon_SingleLineLength - 6
+	_t = ''
+
+	//---- 大項目
+	_t += '\f[bold,1]時刻\f[bold,0]\n'
+	
+	//---- モード０
+	if TimeMode == 0 {
+		_t += '⇒\![*]現時刻'
+	}
+	else {
+		_t += '\![*]\__q[OnTimeModeSet,0]'
+		_t += SHIORI3FW.MakeJustText('現時刻',_length)
+		_t += '\__q'
+	}
+	_t += '\n'
+	_t += '毎時1分、16分、31分、46分に情報更新'
+	_t += '\n[150]'
+	
+	//---- モード１
+	if TimeMode == 1 {
+		_t += '⇒'
+	}
+	_t += '\![*]\__q[OnTimeModeSet,1]'	
+
+	_time = SecToTimeOffset(TimeOffset)
+	if STRLEN(_time) > 0 {
+		_time = '相対時刻: ' + _time
+	}
+	else {
+		_time = '相対時刻'
+	}
+	_t += SHIORI3FW.MakeJustText(_time,_length)
+	_t += '\__q\n'
+	
+	_t += '6日以上前の情報は1日に1回更新\n'
+	_t += 'それ以外は毎時1分に情報更新'
+	_t += '\n[150]'
+
+	//---- モード２
+	if TimeMode == 2 {
+		_t += '⇒'
+	}
+	_time = SecToTimeText( TimeFixed )
+	_t += '\![*]\__q[OnTimeModeSet,2]'
+	_t += SHIORI3FW.MakeJustText('固定時刻: '+_time,_length)
+	_t += '\__q\n'
+		
+	_t += '6日以上前の情報は設定変更後1回のみ更新\n'
+	_t += 'それ以外は毎時1分に情報更新'
+
+	ScriptHead + _t + CloseMenu(1) + '\e'
+}
+
+OnTimeModeSet
+{
+	TimeMode = reference[0]
+
+	if TimeMode == 0 {
+		//現時刻モード
+		Result_Mode0 = IARRAY
+		Result_Mode1 = IARRAY
+		Result_Mode2 = IARRAY
+		IsInfoTime = 'current'
+		OnTimeModeSelect
+	}
+	elseif TimeMode == 1 {
+		//現時刻＋αモード
+		OnTimeModeSet_Offset_DateInputExec
+	}
+	else {
+		//固定時刻モード
+		OnTimeModeSet_Fixed_DateInputExec
+	}
+}
+
+OnTimeModeSet_Offset_DateInputExec
+{
+	ScriptHead
+	--
+	'\![open,dateinput,OnTimeModeSet_Offset_DateInput,--timeout=0,--text="'
+	--
+	_date = GETTIME()
+	if GETTYPEEX( 'TimeOffset' ) == 1 {
+		_date = GETTIME( GETSECCOUNT() + TimeOffset )
+	}
+	_date[0] + ',' + _date[1] + ',' + _date[2]
+	--
+	'"]'
+	--
+	'取得開始する日付を選択してください。\n過去は1940年1月1日から、\n未来は15日後までです。'
+	--
+	'\e'
+}
+
+OnTimeModeSet_Offset_DateInputCancel
+{
+	OnTimeModeSelect
+}
+
+OnTimeModeSet_Offset_DateInput
+{
+	_time = reference[0]
+	TimeOffset_Date = IARRAY
+	TimeOffset_Date[0] = TOINT(_time[0])
+	TimeOffset_Date[1] = TOINT(_time[1])
+	TimeOffset_Date[2] = TOINT(_time[2])
+
+	OnTimeModeSet_Offset_TimeInputExec
+}
+
+OnTimeModeSet_Offset_TimeInputExec
+{
+	ScriptHead
+	--
+	'\![open,timeinput,OnTimeModeSet_Offset_TimeInput,--timeout=0,--text="'
+	--
+	_date = GETTIME()
+	if GETTYPEEX( 'TimeOffset' ) == 1 {
+		_date = GETTIME( GETSECCOUNT() + TimeOffset )
+	}
+	_date[4] + ',' + _date[5] + ',0'
+	--
+	'"]'
+	--
+	'続けて、取得開始する時刻を選択してください。'
+	--
+	'\e'
+}
+
+OnTimeModeSet_Offset_TimeInputCancel
+{
+	OnTimeModeSelect
+}
+
+OnTimeModeSet_Offset_TimeInput
+{
+	_time = reference[0]
+	_time[0] = TOINT(_time[0])
+	_time[1] = TOINT(_time[1])
+	_time[2] = TOINT(_time[2])
+
+	_date = TimeOffset_Date
+
+	_sec_now = GETSECCOUNT()
+	_sec_input = GETSECCOUNT(_date[0],_date[1],_date[2],0,_time[0],_time[1],_time[2])
+
+	_now = GETTIME()
+	_pastlimit = GETSECCOUNT( 1940 , 1 , 1 , 0 , 0 , 0 , 0 )
+	_futurelimit = GETSECCOUNT( _now[0] , _now[1] , _now[2]+15 , 0 , _now[4] , _now[5] , _now[6] )
+
+	if _sec_input > _sec_now {
+		//未来方向
+		IsInfoTime = 'future'
+		if _sec_input >= _futurelimit {
+			//未来方向は16日後まで
+			TimeOffset = _futurelimit - _sec_now
+		}
+		else {
+			TimeOffset = _sec_input - _sec_now
+		}
+	}
+	else {
+		//過去方向
+		IsInfoTime = 'past'
+		if _sec_input < _pastlimit {
+			//過去方向は1940年1月1日から
+			TimeOffset = _pastlimit - _sec_now
+		}
+		else {
+			TimeOffset = _sec_input - _sec_now
+		}
+	}
+
+	ERASEVAR('TimeOffset_Date')
+	Result_Mode0 = IARRAY
+	Result_Mode1 = IARRAY
+	Result_Mode2 = IARRAY
+
+	OnTimeModeSelect
+}
+
+OnTimeModeSet_Fixed_DateInputExec
+{
+	ScriptHead
+	--
+	'\![open,dateinput,OnTimeModeSet_Fixed_DateInput,--timeout=0,--text="'
+	--
+	_date = GETTIME()
+	if GETTYPEEX( 'TimeFixed' ) == 1 {
+		_date = GETTIME( TimeFixed )
+	}
+	_date[0] + ',' + _date[1] + ',' + _date[2]
+	--
+	'"]'
+	--
+	'取得する日付を選択してください。\n過去は1940年1月1日から、\n未来は15日後までです。'
+	--
+	'\e'
+}
+
+OnTimeModeSet_Fixed_DateInputCancel
+{
+	OnTimeModeSelect
+}
+
+OnTimeModeSet_Fixed_DateInput
+{
+	TimeFixed_Date = reference[0]
+	TimeFixed_Date[0] = TOINT(TimeFixed_Date[0])
+	TimeFixed_Date[1] = TOINT(TimeFixed_Date[1])
+	TimeFixed_Date[2] = TOINT(TimeFixed_Date[2])
+	OnTimeModeSet_Fixed_TimeInputExec
+}
+
+OnTimeModeSet_Fixed_TimeInputExec
+{
+	ScriptHead
+	--
+	'\![open,timeinput,OnTimeModeSet_Fixed_TimeInput,--timeout=0,--text="'
+	--
+	_date = GETTIME()
+	if GETTYPEEX( 'TimeFixed' ) == 1 {
+		_date = GETTIME( TimeFixed )
+	}
+	_date[4] + ',' + _date[5] + ',0'
+	--
+	'"]'
+	--
+	'続けて、取得する時刻を選択してください。'
+	--
+	'\e'
+}
+
+OnTimeModeSet_Fixed_TimeInputCancel
+{
+	OnTimeModeSelect
+}
+
+OnTimeModeSet_Fixed_TimeInput
+{
+	_time = reference[0]
+	_time[0] = TOINT(_time[0])
+	_time[1] = TOINT(_time[1])
+	_time[2] = TOINT(_time[2])
+
+	_date = TimeFixed_Date
+
+	_sec_input = GETSECCOUNT(_date[0],_date[1],_date[2],0,_time[0],_time[1],_time[2])
+
+	_now = GETTIME()
+	_pastlimit = GETSECCOUNT( 1940 , 1 , 1 , 0 , 0 , 0 , 0 )
+	_futurelimit = GETSECCOUNT( _now[0] , _now[1] , _now[2]+15 , 0 , _now[4] , _now[5] , _now[6] )
+
+	if _sec_input > _sec_now {
+		//未来方向
+		IsInfoTime = 'future'
+		if _sec_input >= _futurelimit {
+			//未来方向は16日後まで
+			TimeFixed = _futurelimit - _sec_now
+		}
+		else {
+			TimeFixed = _sec_input - _sec_now
+		}
+	}
+	else {
+		//過去方向
+		IsInfoTime = 'past'
+		if _sec_input < _pastlimit {
+			//過去方向は1940年1月1日から
+			TimeFixed = _pastlimit - _sec_now
+		}
+		else {
+			TimeFixed = _sec_input - _sec_now
+		}
+	}
+
+	ERASEVAR('TimeFixed_Date')
+	Result_Mode0 = IARRAY
+	Result_Mode1 = IARRAY
+	Result_Mode2 = IARRAY
+	
+	OnTimeModeSelect
+}
+
+//---- 色設定
+OnColorThemeSelect
+{
+	_c = TOINT( reference[0] )
+	if GETTYPEEX( '_c' ) != 1 || _c <= 0 {
+		_c = 1
+	}
+
+	OnColorThemeSelect_List( _c )
+}
+
+OnColorThemeSelect_List
+{
+	_lines = CurrentBalloon_Lines - 2
+	_columns = TOINT( CurrentBalloon_SingleLineLength / 14 )
+	_size = ARRAYSIZE( ColorThemeList )
+
+	_MaxCountPerPage = _lines * _columns
+	_CurrentPage = _argv[0]
+	_LastPage = TOINT( _size / _MaxCountPerPage )
+
+	_start = _MaxCountPerPage * ( _CurrentPage - 1 )
+	_end = _start + _MaxCountPerPage
+	if _end > _size { _end = _size }
+
+	_num = _start
+	_t += '\f[bold,1]背景色を選択中..\f[bold,0]\n'
+
+	if _LastPage > 1 {
+		_t += '\f[align,center]' + List_Pager( 'OnColorThemeSelect' , _CurrentPage , _LastPage ) + '\n'
+	}
+
+	for _c2=0; _c2<_columns; _c2++; {
+
+		if _c2>0 { _t+='\_l[0,0]\n' }
+		if _Lastpage > 1 { _t+='\n' }
+
+		for _c1=0; _c1<_lines&&_num<_end; _c1++, _num++; {
+
+			if _c2>0 { _x=_c2*8; _t+="\_l[%(_x)em,]"; }
+
+			_name = ColorThemeList[_num][0]
+			_count = TOINT(ColorThemeList[_num][1])
+			_color = ColorThemeList[_num][2]
+
+
+			if _count != ColorTheme[0] {
+				_t += "\f[color,%(_color)]◆\f[color,default]"
+				_t += "\__q[OnColorThemeSet,%(_num),%(_CurrentPage)]"
+				_t += SHIORI3FW.MakeJustText( _name , 10 )
+				_t += '\__q'
+			}
+			else {
+				_t += '⇒' + _name
+			}
+
+			_t += '\n'
+		}
+	}
+
+	ScriptHead + '\c' + _t + CloseMenu(1) + '\e'
+}
+
+OnColorThemeSet
+{
+	_num = TOINT(reference[0])
+	_page = TOINT(reference[1])
+	ColorTheme[0] = TOINT(ColorThemeList[_num][1])
+	ColorTheme[1] = ColorThemeList[_num][0]
+
+	OnColorThemeSelect_List( _page )
+}
+
+ColorThemeList : array
+{
+	'白,0,#f8f8f2'
+	'黒,2,#272822'
+	'赤,4,#F44336'
+	'桃,6,#E91E63'
+	'赤紫,8,#9C27B0'
+	'青紫,10,#673AB7'
+	'藍,12,#3F51B5'
+	'青,14,#2196F3'
+	'水,16,#03A9F4'
+	'シアン,18,#00BCD4'
+	'青緑,20,#009688'
+	'緑,22,#4CAF50'
+	'黄緑,30,#8BC34A'
+	'ライム,32,#CDDC39'
+	'黄,34,#FFEB3B'
+	'琥珀,36,#FFC107'
+	'橙,38,#FF9800'
+	'濃橙,24,#FF5722'
+	'茶,26,#795548'
+	'灰,40,#9E9E9E'
+	'青灰,28,#607D8B'
+}
+
+
