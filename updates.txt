@@ -113,4 +113,4 @@ file,shell/master/readme.txtaa01ddb7ce70e6b7d4b9275686cdea56size=55date=2012-
 file,shell/master/surface0.png81b266cb3292b44f81f408b9550582b1size=1865date=2012-12-21T00:00:00
 file,shell/master/surface10.pngcc2f91dae86e28aa50088675cf290a1bsize=84date=2012-12-21T00:00:00
 file,shell/master/thumbnail.pnr554a9868fb4eda4ce690ad72f86fad45size=1495date=2012-12-21T00:00:00
-file,thumbnail.pnga13b153687399082301ea7dcc2aba29esize=2319date=2012-12-21T00:00:00
+file,thumbnail.png91d34fb46dcee6543ca70232c3cd007esize=59172date=2012-12-21T00:00:00
