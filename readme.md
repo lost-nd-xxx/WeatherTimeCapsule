@@ -1,5 +1,5 @@
 # WeatherTimeCapsule
-![screenshot](screenshot.png)
+![screenshot](thumbnail.png)
 
 ## 概要
 ゴースト「WeatherTimeCapsule」
