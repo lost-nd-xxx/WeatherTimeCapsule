@@ -698,7 +698,7 @@ FutureInfo
 OnWeatherInfoGet
 {
 	_json = JSON.readFile("var/log.json")
-	_objectID = JSON.readJson(reference[3])
+	_objectID = JSON.readJson(_json)
 	_data = IARRAY
 
 	if TimeMode == 0 {

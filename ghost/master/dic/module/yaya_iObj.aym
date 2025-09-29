@@ -276,8 +276,7 @@ io.iObj{
 	_objName=_items[0]
 	_objIdx=_items[1]
 	_input=_argv
-	// _node=EVAL(_argv[0])
-	LETTONAME( '_node' , EVAL(_argv[0]) )
+	_node=EVAL(_argv[0])
 	for _j=0;_j<ARRAYSIZE(_node);_j+=3{
 		_item=(_node[_j],_node[_j+1],_node[_j+2])
 		if _item[0]==_argv[1] {
