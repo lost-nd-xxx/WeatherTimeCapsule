@@ -66,7 +66,7 @@ file,ghost/master/system_config.txt3965602fadd8acb2ee46c0310704c3e1size=682da
 file,ghost/master/weathericons-regular-webfont.ttf4618f0de2a818e7ad3fe880e0b74d04asize=99564date=2012-12-21T00:00:00
 file,ghost/master/wtc_icon.ico6c14d129773d6bbcbd23bae8464da669size=26694date=2012-12-21T00:00:00
 file,ghost/master/yaya.dllfa8bac5d6d7346524317f731dc63803dsize=880640date=2012-12-21T00:00:00
-file,ghost/master/yaya.txt168b0e681f54a2cbde3eb850e7229108size=2461date=2012-12-21T00:00:00
+file,ghost/master/yaya.txtff7a3048210640de88e0f6ac0c65f317size=2459date=2012-12-21T00:00:00
 file,ghost/master/yaya_emerg.txtd9ee78e2068ff80d809325bd4fa8228bsize=1055date=2012-12-21T00:00:00
 file,install.txtb6c366d37b1c0890870016a63ffa066dsize=158date=2012-12-21T00:00:00
 file,readme.txt5f4a27b16b17af913da5e14479cc05a7size=5766date=2012-12-21T00:00:00
