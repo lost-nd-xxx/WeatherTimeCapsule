@@ -549,7 +549,7 @@ OnWeatherInfoGetExec
 	--
 	ScriptHeadSimple
 	--
-	'\![execute,http-get,"' + _json + '",--async=OnWeatherInfoGet,--nofile=UTF-8]'
+	'\![execute,http-get,"' + _json + '",--async=OnWeatherInfoGet,--file=log.json]'
 	--
 	'Open-Meteoより天気情報を取得中...'
 	--
@@ -697,6 +697,7 @@ FutureInfo
 
 OnWeatherInfoGet
 {
+	_json = JSON.readFile("var/log.json")
 	_objectID = JSON.readJson(reference[3])
 	_data = IARRAY
 
