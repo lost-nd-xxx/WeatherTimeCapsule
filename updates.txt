@@ -51,7 +51,7 @@ file,ghost/master/dic/normal/yaya_menu.dic57b0915da41b0e4b24b0ebaadc23d89bsize
 file,ghost/master/dic/normal/yaya_mouse.dica7bd9573582df44128020a041436e6e7size=2042date=2012-12-21T00:00:00
 file,ghost/master/dic/normal/yaya_string.dic51acb9076877858adf22bbe6e71aff4asize=3250date=2012-12-21T00:00:00
 file,ghost/master/dic/normal/yaya_tmpl_util.dic4ec9a9be012b35fdbbbbc2d7abfb9a48size=8604date=2012-12-21T00:00:00
-file,ghost/master/dic/normal/yaya_weather.dicb80f5152d5e6244b039492f86387f579size=19800date=2012-12-21T00:00:00
+file,ghost/master/dic/normal/yaya_weather.dicdeabaea87c58376b99091e518fba65a9size=19840date=2012-12-21T00:00:00
 file,ghost/master/dic/system/_loading_order.txt9c350c2c9c08f635bff5eaae149af8c8size=103date=2012-12-21T00:00:00
 file,ghost/master/dic/system/compatible.dic4f8b1e8c8c08dc44e70b1bd4f52a1affsize=4297date=2012-12-21T00:00:00
 file,ghost/master/dic/system/config.dic138f5ba9678b5e241e953b0398b7fbd6size=2590date=2012-12-21T00:00:00
